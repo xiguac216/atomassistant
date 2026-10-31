@@ -73,13 +73,22 @@ enum Defaults {
         get { d.dictionary(forKey: "uploadCount") as? [String: Int] ?? [:] }
         set { d.set(newValue, forKey: "uploadCount") }
     }
+    /// 后台保活（静音音频）和位置唤醒的开关。
+    static var keepAlive: Bool {
+        get { d.bool(forKey: "keepAlive") }
+        set { d.set(newValue, forKey: "keepAlive") }
+    }
+    static var wakeOnMove: Bool {
+        get { d.bool(forKey: "wakeOnMove") }
+        set { d.set(newValue, forKey: "wakeOnMove") }
+    }
     static var lastSync: Date? {
         get { d.object(forKey: "lastSync") as? Date }
         set { d.set(newValue, forKey: "lastSync") }
     }
 
     static func clearAll() {
-        for k in ["serverURL", "deviceName", "enabledKinds", "lastUpload", "uploadCount", "lastSync"] {
+        for k in ["serverURL", "deviceName", "enabledKinds", "lastUpload", "uploadCount", "lastSync", "keepAlive", "wakeOnMove"] {
             d.removeObject(forKey: k)
         }
     }

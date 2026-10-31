@@ -35,6 +35,10 @@ final class AppModel: ObservableObject {
     /// 每种数据最近一次采集失败的原因，采集成功后清掉。
     @Published private(set) var collectErrors: [String: String] = [:]
     @Published private(set) var logs: [LogEntry] = []
+    /// 后台保活（静音音频）与位置唤醒是否开着，以及保活起不来的原因。
+    @Published private(set) var keepAlive = Defaults.keepAlive
+    @Published private(set) var wakeOnMove = Defaults.wakeOnMove
+    @Published private(set) var keepAliveError: String?
 
     /// 从二维码或链接里带来的、等待确认的配对信息。
     @Published var incomingPairing: (server: String, code: String)?
@@ -117,6 +121,11 @@ final class AppModel: ObservableObject {
 
     func unpair() {
         stopLoop()
+        BackgroundKeeper.shared.stopAudio()
+        BackgroundKeeper.shared.stopWake()
+        keepAlive = false
+        wakeOnMove = false
+        keepAliveError = nil
         Keychain.remove(tokenAccount)
         Defaults.clearAll()
         Persistence.removeAll()
@@ -420,9 +429,46 @@ final class AppModel: ObservableObject {
         UNUserNotificationCenter.current().setBadgeCount(n) { _ in }
     }
 
+    // MARK: 后台保活
+
+    func setKeepAlive(_ on: Bool) {
+        keepAliveError = nil
+        if on {
+            if let why = BackgroundKeeper.shared.startAudio() {
+                keepAliveError = why
+                log("后台保活没能开启：\(why)", .warn)
+                return
+            }
+            startLoop()
+            log("已开启后台保活")
+        } else {
+            BackgroundKeeper.shared.stopAudio()
+            log("已关闭后台保活")
+        }
+        keepAlive = on
+        Defaults.keepAlive = on
+    }
+
+    func setWakeOnMove(_ on: Bool) {
+        if on { BackgroundKeeper.shared.startWake() } else { BackgroundKeeper.shared.stopWake() }
+        wakeOnMove = on
+        Defaults.wakeOnMove = on
+        log(on ? "已开启位置唤醒" : "已关闭位置唤醒")
+    }
+
+    /// App 启动（包括被位置唤醒、在后台启动）时，按上次的开关恢复后台运行。
+    func resumeBackground() {
+        guard paired else { return }
+        if keepAlive {
+            if let why = BackgroundKeeper.shared.startAudio() { keepAliveError = why }
+            startLoop()
+        }
+        if wakeOnMove { BackgroundKeeper.shared.startWake() }
+    }
+
     // MARK: 前台循环与后台刷新
 
-    /// App 在前台时每 5 分钟同步一次。
+    /// 每 5 分钟同步一次。在前台一直跑；开了后台保活时切到后台也继续。
     func startLoop() {
         guard loop == nil else { return }
         loop = Task { [weak self] in

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct SettingsView: View {
     @EnvironmentObject var model: AppModel
@@ -11,6 +12,44 @@ struct SettingsView: View {
                     LabeledContent("设备名", value: model.deviceName)
                     LabeledContent("服务器", value: URL(string: model.serverURL)?.host ?? model.serverURL)
                     LabeledContent("连接", value: model.tokenInvalid ? "令牌已失效" : "正常")
+                }
+
+                Section {
+                    Toggle(isOn: Binding(get: { model.keepAlive }, set: { model.setKeepAlive($0) })) {
+                        HStack(spacing: 12) {
+                            IconTile(symbol: "bolt.horizontal.fill", tint: .green)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("后台保活").font(.system(size: 16))
+                                Text("循环播放静音，让 App 一直在后台同步").font(.footnote).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    if let e = model.keepAliveError {
+                        Label(e, systemImage: "exclamationmark.triangle.fill").font(.footnote).foregroundStyle(.orange)
+                    }
+                    Toggle(isOn: Binding(get: { model.wakeOnMove }, set: { model.setWakeOnMove($0) })) {
+                        HStack(spacing: 12) {
+                            IconTile(symbol: "location.circle.fill", tint: .blue)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("移动时唤醒").font(.system(size: 16))
+                                Text("被系统杀掉后，移动约 500 米会重新拉起").font(.footnote).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    if model.wakeOnMove && BackgroundKeeper.shared.wakeAuthorization != .authorizedAlways {
+                        Label("还没有「始终允许」定位权限，移动时唤醒不会生效。请到 设置 → 隐私与安全性 → 定位服务 → 原子助手 改成「始终」。",
+                              systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote).foregroundStyle(.orange)
+                    }
+                    if UIApplication.shared.backgroundRefreshStatus != .available {
+                        Label("系统的「后台 App 刷新」是关的，请到 设置 → 通用 → 后台 App 刷新 打开。",
+                              systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote).foregroundStyle(.orange)
+                    }
+                } header: {
+                    Text("后台运行")
+                } footer: {
+                    Text("后台保活会多耗一点电。位置唤醒只把位置变化当作叫醒信号，不读取、不上传位置。你手动划掉 App 之后，系统基本不会再拉起它。")
                 }
 
                 Section {

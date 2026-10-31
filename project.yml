@@ -42,6 +42,7 @@ targets:
           - fetch
           - processing
           - location
+          - audio
         BGTaskSchedulerPermittedIdentifiers:
           - io.github.xiguac.ios.atomassistant.refresh
         CFBundleURLTypes:
