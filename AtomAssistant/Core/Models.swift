@@ -10,7 +10,6 @@ enum DataKind: String, CaseIterable, Identifiable, Codable {
     case healthSummary = "health.summary"
     case mediaNowPlaying = "media.nowplaying"
     case mediaLibrary = "media.library"
-    case appsInstalled = "apps.installed"
     case focusStatus = "focus.status"
     case probeReport = "probe.report"
     case locationNow = "location.now"
@@ -41,7 +40,6 @@ enum DataKind: String, CaseIterable, Identifiable, Codable {
         case .healthSummary: return "健康摘要"
         case .mediaNowPlaying: return "正在播放"
         case .mediaLibrary: return "音乐库"
-        case .appsInstalled: return "已安装的应用"
         case .focusStatus: return "专注模式"
         case .probeReport: return "能力探测"
         case .locationNow: return "当前位置"
@@ -61,7 +59,6 @@ enum DataKind: String, CaseIterable, Identifiable, Codable {
         case .healthSummary: return "步数、心率、睡眠、活动能量等"
         case .mediaNowPlaying: return "歌名、歌手、来源应用"
         case .mediaLibrary: return "歌曲数量与最近播放"
-        case .appsInstalled: return "手机上装了哪些应用"
         case .focusStatus: return "专注模式是否开启"
         case .probeReport: return "哪些系统接口在这台手机上可用"
         case .locationNow: return "此刻的位置"
@@ -81,7 +78,6 @@ enum DataKind: String, CaseIterable, Identifiable, Codable {
         case .healthSummary: return "heart.fill"
         case .mediaNowPlaying: return "music.note"
         case .mediaLibrary: return "music.note.list"
-        case .appsInstalled: return "square.grid.2x2.fill"
         case .focusStatus: return "moon.fill"
         case .probeReport: return "stethoscope"
         case .locationNow: return "location.fill"
@@ -99,7 +95,6 @@ enum DataKind: String, CaseIterable, Identifiable, Codable {
         case .motionPedometer, .motionActivity, .motionQuery: return .orange
         case .healthSummary, .healthQuery: return .pink
         case .mediaNowPlaying, .mediaLibrary: return .red
-        case .appsInstalled: return .indigo
         case .focusStatus: return .purple
         case .probeReport: return .teal
         case .locationNow, .locationTrack: return .blue

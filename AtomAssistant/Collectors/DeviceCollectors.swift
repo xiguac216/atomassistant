@@ -2,7 +2,6 @@ import Foundation
 import UIKit
 import AVFoundation
 import Network
-import NetworkExtension
 import CoreTelephony
 
 // MARK: - 设备状态
@@ -14,10 +13,7 @@ struct DeviceStatusCollector: Collector {
 
     func collect(params: [String: Any]) async throws -> [Sample] {
         let now = Date()
-        var p = await MainActor.run { Self.snapshot() }
-        // 私有接口：电池的详细情况。拿不到就只记一下为什么，不影响其他字段。
-        let battery = PrivateAPI.batteryDetail()
-        if let v = battery.value { p["batteryDetail"] = v } else if let e = battery.error { p["batteryDetailError"] = e }
+        let p = await MainActor.run { Self.snapshot() }
         return [Sample(key: bucketKey("status", seconds: 300, at: now), capturedAt: now, payload: p)]
     }
 
@@ -71,7 +67,6 @@ struct SystemCollector: Collector {
         p["modelIdentifier"] = Self.machine()
         p["systemName"] = await MainActor.run { UIDevice.current.systemName }
         p["systemVersion"] = await MainActor.run { UIDevice.current.systemVersion }
-        p["deviceName"] = await MainActor.run { UIDevice.current.name }
         p["physicalMemoryBytes"] = ProcessInfo.processInfo.physicalMemory
         p["cpuCores"] = ProcessInfo.processInfo.processorCount
         p["uptimeSeconds"] = ProcessInfo.processInfo.systemUptime
@@ -140,12 +135,6 @@ struct NetworkCollector: Collector {
         if let techs = tel.serviceCurrentRadioAccessTechnology, !techs.isEmpty {
             p["radioTechnologies"] = techs.values.map { $0.replacingOccurrences(of: "CTRadioAccessTechnology", with: "") }
         }
-
-        // Wi-Fi 名需要特殊的 entitlement，免费签名拿不到，探测一下就好。
-        let wifi: String? = await callbackWithTimeout(3, fallback: nil) { done in
-            NEHotspotNetwork.fetchCurrent { net in done(net?.ssid) }
-        }
-        if let wifi { p["ssid"] = wifi } else { p["ssidError"] = "拿不到（需要 Wi-Fi 信息的 entitlement 和定位权限）" }
 
         return [Sample(key: bucketKey("net", seconds: 300, at: now), capturedAt: now, payload: p)]
     }

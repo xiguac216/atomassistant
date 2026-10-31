@@ -21,7 +21,7 @@ enum Collectors {
             PedometerCollector(), ActivityCollector(),
             HealthSummaryCollector(),
             NowPlayingCollector(), MediaLibraryCollector(),
-            InstalledAppsCollector(), FocusCollector(),
+            FocusCollector(),
             LocationNowCollector(), LocationTrackCollector(),
             HealthQueryCollector(), MotionQueryCollector(),
         ]

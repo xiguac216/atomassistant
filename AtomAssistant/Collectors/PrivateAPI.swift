@@ -1,7 +1,10 @@
 import Foundation
 import UIKit
 
-/// 私有接口。没有头文件，全靠 dlopen / dlsym / ObjC 运行时在运行期找；找不到、没权限、返回空都不是错误，
+/// 私有接口。实测在这台手机上能用的只有 MobileGestalt 的一部分键，MediaRemote 还待复测；
+/// 其余（电池详情、已安装应用等）被系统拦了，已经删掉。
+///
+/// 没有头文件，全靠 dlopen / dlsym / ObjC 运行时在运行期找；找不到、没权限、返回空都不是错误，
 /// 只是这台手机上拿不到——「能力探测」页会把每一项实测的结果列出来。
 ///
 /// 写法上的两条纪律：
@@ -17,11 +20,11 @@ enum PrivateAPI {
 
     private typealias MGCopyAnswerFn = @convention(c) (UnsafeRawPointer) -> UnsafeMutableRawPointer?
 
+    /// 只列实测能返回内容的键。序列号、UDID、IMEI、MAC 在这台手机上都被系统拦了，不再去读。
     static let gestaltKeys = [
-        "ProductType", "HWModelStr", "ModelNumber", "RegionInfo", "BuildVersion", "DeviceName",
-        "SerialNumber", "UniqueDeviceID", "InternationalMobileEquipmentIdentity", "WifiAddress", "BluetoothAddress",
-        "DieID", "CPUArchitecture", "MarketingProductName", "DeviceColor", "HasBaseband",
-        "ArtworkDeviceSubType", "main-screen-width", "main-screen-height", "main-screen-scale",
+        "ProductType", "HWModelStr", "ModelNumber", "RegionInfo", "BuildVersion", "CPUArchitecture",
+        "MarketingProductName", "DeviceColor", "HasBaseband",
+        "main-screen-width", "main-screen-height", "main-screen-scale",
     ]
 
     static func gestalt(_ keys: [String] = gestaltKeys) -> Outcome<[String: Any]> {
@@ -38,47 +41,6 @@ enum PrivateAPI {
             out[k] = JSON.clean(obj)
         }
         return .init(value: out.isEmpty ? nil : out, error: out.isEmpty ? "所有键都返回空（被系统拦了）" : nil)
-    }
-
-    // MARK: IOKit：电池的详细情况（循环次数、最大容量、温度）
-
-    private typealias IOMatching = @convention(c) (UnsafePointer<CChar>) -> UnsafeMutableRawPointer?
-    private typealias IOGetService = @convention(c) (UInt32, UnsafeMutableRawPointer?) -> UInt32
-    private typealias IOCreateProps = @convention(c) (UInt32, UnsafeMutablePointer<UnsafeMutableRawPointer?>, UnsafeRawPointer?, UInt32) -> Int32
-    private typealias IORelease = @convention(c) (UInt32) -> Int32
-
-    static func batteryDetail() -> Outcome<[String: Any]> {
-        guard let h = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_NOW) else {
-            return .init(value: nil, error: "dlopen IOKit 失败")
-        }
-        guard let s1 = dlsym(h, "IOServiceMatching"), let s2 = dlsym(h, "IOServiceGetMatchingService"),
-              let s3 = dlsym(h, "IORegistryEntryCreateCFProperties"), let s4 = dlsym(h, "IOObjectRelease") else {
-            return .init(value: nil, error: "IOKit 里找不到所需函数")
-        }
-        let matching = unsafeBitCast(s1, to: IOMatching.self)
-        let getService = unsafeBitCast(s2, to: IOGetService.self)
-        let createProps = unsafeBitCast(s3, to: IOCreateProps.self)
-        let release = unsafeBitCast(s4, to: IORelease.self)
-
-        // IOServiceGetMatchingService 会消耗掉 matching 字典，不用自己释放。
-        guard let dict = matching("AppleSmartBattery") else { return .init(value: nil, error: "建不出匹配字典") }
-        let service = getService(0, dict)
-        guard service != 0 else { return .init(value: nil, error: "找不到 AppleSmartBattery 服务（被沙盒拦了或没有）") }
-        defer { _ = release(service) }
-
-        var props: UnsafeMutableRawPointer?
-        guard createProps(service, &props, nil, 0) == 0, let p = props else {
-            return .init(value: nil, error: "读不出电池属性")
-        }
-        let all = Unmanaged<NSDictionary>.fromOpaque(p).takeRetainedValue()
-        let wanted = ["CycleCount", "DesignCapacity", "MaxCapacity", "NominalChargeCapacity", "AppleRawMaxCapacity",
-                      "AppleRawCurrentCapacity", "CurrentCapacity", "Temperature", "Voltage", "InstantAmperage",
-                      "IsCharging", "FullyCharged", "ExternalConnected", "BatteryInstalled", "AdapterDetails"]
-        var out: [String: Any] = [:]
-        for k in wanted {
-            if let v = all[k] { out[k] = JSON.clean(v) }
-        }
-        return .init(value: out.isEmpty ? nil : out, error: out.isEmpty ? "属性里没有想要的键" : nil)
     }
 
     // MARK: MediaRemote：正在播放（任意 App，不止音乐）
@@ -118,46 +80,5 @@ enum PrivateAPI {
             if let playing { result["IsPlaying"] = playing }
         }
         return .init(value: result, error: nil)
-    }
-
-    // MARK: LaunchServices：已安装的应用
-
-    static func installedApps() -> Outcome<[[String: Any]]> {
-        guard let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type else {
-            return .init(value: nil, error: "没有 LSApplicationWorkspace 这个类")
-        }
-        let defaultSel = NSSelectorFromString("defaultWorkspace")
-        guard cls.responds(to: defaultSel),
-              let ws = cls.perform(defaultSel)?.takeUnretainedValue() as? NSObject else {
-            return .init(value: nil, error: "拿不到 defaultWorkspace")
-        }
-        let listSel = NSSelectorFromString("allInstalledApplications")
-        guard ws.responds(to: listSel) else { return .init(value: nil, error: "没有 allInstalledApplications 方法") }
-        guard let list = ws.perform(listSel)?.takeUnretainedValue() as? [NSObject] else {
-            return .init(value: nil, error: "调用返回空（被系统拦了）")
-        }
-        if list.isEmpty { return .init(value: nil, error: "返回了空列表（被系统拦了）") }
-
-        func read(_ obj: NSObject, _ key: String) -> Any? {
-            guard obj.responds(to: NSSelectorFromString(key)) else { return nil }
-            return obj.value(forKey: key)
-        }
-        var out: [[String: Any]] = []
-        for app in list {
-            var row: [String: Any] = [:]
-            if let v = read(app, "bundleIdentifier") as? String { row["id"] = v }
-            if let v = read(app, "localizedName") as? String { row["name"] = v }
-            if let v = read(app, "applicationType") as? String { row["type"] = v }
-            if let v = read(app, "shortVersionString") as? String { row["version"] = v }
-            if row["id"] != nil { out.append(row) }
-        }
-        out.sort { ($0["id"] as? String ?? "") < ($1["id"] as? String ?? "") }
-        return .init(value: out, error: out.isEmpty ? "读不出任何应用的信息" : nil)
-    }
-
-    // MARK: 动态库是否存在（只探测能不能加载，不调用）
-
-    static func canLoad(_ path: String) -> Bool {
-        dlopen(path, RTLD_NOW) != nil
     }
 }

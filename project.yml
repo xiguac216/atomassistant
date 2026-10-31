@@ -57,14 +57,12 @@ targets:
         NSLocationAlwaysAndWhenInUseUsageDescription: 只在你同意某次授权需求时读取位置，发给你自己的助手。
         NSAppleMusicUsageDescription: 读取音乐库摘要，上报给你自己的助手。
         NSFocusStatusUsageDescription: 读取专注模式是否开启，上报给你自己的助手。
-        NSLocalNetworkUsageDescription: 读取当前网络状态。
     dependencies:
       - sdk: HealthKit.framework
       - sdk: CoreMotion.framework
       - sdk: CoreLocation.framework
       - sdk: MediaPlayer.framework
       - sdk: Intents.framework
-      - sdk: NetworkExtension.framework
       - sdk: AVFoundation.framework
       - sdk: BackgroundTasks.framework
       - sdk: UserNotifications.framework

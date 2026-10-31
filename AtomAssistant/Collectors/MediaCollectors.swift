@@ -85,23 +85,6 @@ struct MediaLibraryCollector: Collector {
     }
 }
 
-// MARK: - 已安装的应用（私有接口）
-
-struct InstalledAppsCollector: Collector {
-    let kind = DataKind.appsInstalled
-
-    func authorize() async -> String? { nil }
-
-    func collect(params: [String: Any]) async throws -> [Sample] {
-        let r = PrivateAPI.installedApps()
-        guard let apps = r.value else { throw CollectError("读不到已安装的应用：" + (r.error ?? "未知原因")) }
-        let now = Date()
-        let user = apps.filter { ($0["type"] as? String) == "User" }
-        let p: [String: Any] = ["total": apps.count, "userAppCount": user.count, "apps": apps]
-        return [Sample(key: bucketKey("apps", seconds: 12 * 3600, at: now), capturedAt: now, payload: p)]
-    }
-}
-
 // MARK: - 专注模式
 
 struct FocusCollector: Collector {

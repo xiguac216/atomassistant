@@ -30,58 +30,12 @@ enum Prober {
         } else {
             out.append(.init(group: "私有接口", name: "MobileGestalt 设备信息", status: .blocked, detail: g.error ?? "未知"))
         }
-        let b = PrivateAPI.batteryDetail()
-        if let v = b.value {
-            out.append(.init(group: "私有接口", name: "IOKit 电池详情", status: .ok,
-                             detail: v.keys.sorted().map { "\($0)=\(v[$0] ?? "")" }.joined(separator: "，")))
-        } else {
-            out.append(.init(group: "私有接口", name: "IOKit 电池详情", status: .blocked, detail: b.error ?? "未知"))
-        }
         let np = await PrivateAPI.nowPlaying()
         if let v = np.value {
             out.append(.init(group: "私有接口", name: "MediaRemote 正在播放", status: .ok, detail: "读到 \(v.count) 个字段：\(v.keys.sorted().joined(separator: "、"))"))
         } else {
             // 没在播放和被拦了在这里分不开，所以只说「没拿到」。
             out.append(.init(group: "私有接口", name: "MediaRemote 正在播放", status: .partial, detail: (np.error ?? "未知") + "。放首歌再探测一次可以区分是没在播还是被拦了"))
-        }
-        let apps = PrivateAPI.installedApps()
-        if let v = apps.value {
-            out.append(.init(group: "私有接口", name: "LaunchServices 已安装应用", status: .ok, detail: "读到 \(v.count) 个应用"))
-        } else {
-            out.append(.init(group: "私有接口", name: "LaunchServices 已安装应用", status: .blocked, detail: apps.error ?? "未知"))
-        }
-        for (name, path) in [
-            ("CoreDuet（使用行为库）", "/System/Library/PrivateFrameworks/CoreDuet.framework/CoreDuet"),
-            ("SpringBoardServices", "/System/Library/PrivateFrameworks/SpringBoardServices.framework/SpringBoardServices"),
-            ("BackBoardServices", "/System/Library/PrivateFrameworks/BackBoardServices.framework/BackBoardServices"),
-            ("CoreTelephony 私有部分", "/System/Library/PrivateFrameworks/CoreTelephony.framework/CoreTelephony"),
-        ] {
-            let ok = PrivateAPI.canLoad(path)
-            out.append(.init(group: "私有接口", name: "加载 \(name)", status: ok ? .partial : .blocked,
-                             detail: ok ? "能加载，但具体功能多半还要 entitlement，需要进一步试" : "加载失败"))
-        }
-
-        // 沙盒：别的 App 和系统的数据文件读不读得到
-        let paths: [(String, String)] = [
-            ("短信库", "/var/mobile/Library/SMS/sms.db"),
-            ("通话记录", "/var/mobile/Library/CallHistoryDB/CallHistory.storedata"),
-            ("通讯录库", "/var/mobile/Library/AddressBook/AddressBook.sqlitedb"),
-            ("备忘录库", "/var/mobile/Library/Notes/notes.sqlite"),
-            ("Safari 书签", "/var/mobile/Library/Safari/Bookmarks.db"),
-            ("使用行为库 knowledgeC", "/private/var/mobile/Library/CoreDuet/Knowledge/knowledgeC.db"),
-            ("相册库", "/var/mobile/Media/PhotoData/Photos.sqlite"),
-            ("系统偏好设置目录", "/var/mobile/Library/Preferences"),
-            ("应用安装目录", "/var/containers/Bundle/Application"),
-        ]
-        for (name, path) in paths {
-            let fd = open(path, O_RDONLY)
-            if fd >= 0 {
-                close(fd)
-                out.append(.init(group: "沙盒", name: name, status: .ok, detail: "可以打开：\(path)"))
-            } else {
-                let e = errno
-                out.append(.init(group: "沙盒", name: name, status: .blocked, detail: "打不开（\(String(cString: strerror(e)))）"))
-            }
         }
 
         // 公开接口与权限
