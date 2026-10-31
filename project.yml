@@ -77,3 +77,4 @@ targets:
       - sdk: UserNotifications.framework
       - sdk: CoreTelephony.framework
       - sdk: CoreBluetooth.framework
+      - sdk: AppIntents.framework

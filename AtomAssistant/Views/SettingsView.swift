@@ -39,6 +39,17 @@ struct SettingsView: View {
 
                 Section {
                     NavigationLink {
+                        ShortcutsView()
+                    } label: {
+                        HStack(spacing: 12) {
+                            IconTile(symbol: "bubble.left.and.text.bubble.right.fill", tint: .indigo)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("快捷指令").font(.system(size: 16))
+                                Text("说一句话问助手，答复发到 QQ").font(.footnote).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    NavigationLink {
                         ProbeView()
                     } label: {
                         HStack(spacing: 12) {

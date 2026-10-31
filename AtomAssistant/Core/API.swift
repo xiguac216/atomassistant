@@ -104,6 +104,16 @@ struct APIClient {
         try await send("requests/\(requestID)/fulfil", kind: kind, items: items)
     }
 
+    /// 把用户说的话（可带一张已压缩的截屏）交给助手，答复由服务器通过消息源发回。
+    func ask(text: String, screenshot: Data?, mime: String) async throws {
+        var obj: [String: Any] = ["text": text]
+        if let screenshot {
+            obj["screenshot_base64"] = screenshot.base64EncodedString()
+            obj["screenshot_mime"] = mime
+        }
+        _ = try await request("POST", "ask", body: try JSONSerialization.data(withJSONObject: obj))
+    }
+
     func decline(requestID: String) async throws {
         _ = try await request("POST", "requests/\(requestID)/decline", body: Data("{}".utf8))
     }
