@@ -7,14 +7,11 @@ enum DataKind: String, CaseIterable, Identifiable, Codable {
     case deviceNetwork = "device.network"
     case motionPedometer = "motion.pedometer"
     case motionActivity = "motion.activity"
-    case healthSummary = "health.summary"
-    case mediaNowPlaying = "media.nowplaying"
     case focusStatus = "focus.status"
     case probeReport = "probe.report"
     case locationCoarse = "location.coarse"
     case locationNow = "location.now"
     case locationTrack = "location.track"
-    case healthQuery = "health.query"
     case motionQuery = "motion.query"
     case nfcRead = "nfc.read"
     case bluetoothScan = "bluetooth.scan"
@@ -25,7 +22,7 @@ enum DataKind: String, CaseIterable, Identifiable, Codable {
     /// 为真表示每次采集都要用户点同意，只能挂在授权需求上上报。
     var perUse: Bool {
         switch self {
-        case .locationNow, .locationTrack, .healthQuery, .motionQuery, .nfcRead, .bluetoothScan, .networkScan: return true
+        case .locationNow, .locationTrack, .motionQuery, .nfcRead, .bluetoothScan, .networkScan: return true
         default: return false
         }
     }
@@ -40,14 +37,11 @@ enum DataKind: String, CaseIterable, Identifiable, Codable {
         case .deviceNetwork: return "网络状态"
         case .motionPedometer: return "计步"
         case .motionActivity: return "运动状态"
-        case .healthSummary: return "健康摘要"
-        case .mediaNowPlaying: return "正在播放"
         case .focusStatus: return "专注模式"
         case .probeReport: return "能力探测"
         case .locationCoarse: return "粗略位置"
         case .locationNow: return "当前位置"
         case .locationTrack: return "位置轨迹"
-        case .healthQuery: return "健康记录"
         case .motionQuery: return "运动历史"
         case .nfcRead: return "NFC 标签"
         case .bluetoothScan: return "蓝牙扫描"
@@ -62,14 +56,11 @@ enum DataKind: String, CaseIterable, Identifiable, Codable {
         case .deviceNetwork: return "Wi-Fi、蜂窝、是否计费"
         case .motionPedometer: return "今日步数、距离、爬楼"
         case .motionActivity: return "静止、步行、跑步、骑行、驾车"
-        case .healthSummary: return "步数、心率、睡眠、活动能量等"
-        case .mediaNowPlaying: return "歌名、歌手、来源应用"
         case .focusStatus: return "专注模式是否开启"
         case .probeReport: return "哪些系统接口在这台手机上可用"
         case .locationCoarse: return "精确位置随机偏移 10–20 公里后的大致位置和城市"
         case .locationNow: return "此刻的位置"
         case .locationTrack: return "一段时间内的移动轨迹"
-        case .healthQuery: return "指定时间段的详细健康记录"
         case .motionQuery: return "指定时间段的计步与运动历史"
         case .nfcRead: return "打开 App 后把手机靠近标签，读取里面的内容"
         case .bluetoothScan: return "扫描附近的蓝牙设备（名称、信号强度）"
@@ -84,14 +75,11 @@ enum DataKind: String, CaseIterable, Identifiable, Codable {
         case .deviceNetwork: return "wifi"
         case .motionPedometer: return "figure.walk"
         case .motionActivity: return "figure.run"
-        case .healthSummary: return "heart.fill"
-        case .mediaNowPlaying: return "music.note"
         case .focusStatus: return "moon.fill"
         case .probeReport: return "stethoscope"
         case .locationCoarse: return "location.circle"
         case .locationNow: return "location.fill"
         case .locationTrack: return "point.topleft.down.curvedto.point.bottomright.up"
-        case .healthQuery: return "waveform.path.ecg"
         case .motionQuery: return "chart.line.uptrend.xyaxis"
         case .nfcRead: return "wave.3.right.circle.fill"
         case .bluetoothScan: return "dot.radiowaves.left.and.right"
@@ -105,8 +93,6 @@ enum DataKind: String, CaseIterable, Identifiable, Codable {
         case .deviceSystem: return .gray
         case .deviceNetwork: return .blue
         case .motionPedometer, .motionActivity, .motionQuery: return .orange
-        case .healthSummary, .healthQuery: return .pink
-        case .mediaNowPlaying: return .red
         case .focusStatus: return .purple
         case .probeReport: return .teal
         case .locationCoarse, .locationNow, .locationTrack: return .blue

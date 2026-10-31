@@ -9,8 +9,12 @@ import CoreNFC
 struct NFCReadCollector: Collector {
     let kind = DataKind.nfcRead
 
+    /// 系统说「不能读 NFC」时的解释。手机本身有 NFC 的话，几乎一定是这个安装包的签名里没有 NFC 权限：
+    /// 读 NFC 需要签名带上 com.apple.developer.nfc.readersession.formats，重签工具没有带上就会这样。
+    static let unavailableText = "系统报告这个安装包不能读 NFC。手机有 NFC 的话，通常是签名里没有 NFC 权限：请确认装的是 AtomAssistant-nfc.ipa，并且重签工具保留了 NFC 权限"
+
     func authorize() async -> String? {
-        NFCNDEFReaderSession.readingAvailable ? nil : "这台设备不支持 NFC 读取"
+        NFCNDEFReaderSession.readingAvailable ? nil : NFCReadCollector.unavailableText
     }
 
     func collect(params: [String: Any]) async throws -> [Sample] {
@@ -59,7 +63,7 @@ final class NFCReader: NSObject, NFCNDEFReaderSessionDelegate {
     private var finished = false
 
     func read(prompt: String) async throws -> [NFCNDEFMessage] {
-        guard NFCNDEFReaderSession.readingAvailable else { throw CollectError("这台设备不支持 NFC 读取") }
+        guard NFCNDEFReaderSession.readingAvailable else { throw CollectError(NFCReadCollector.unavailableText) }
         return try await withCheckedThrowingContinuation { (c: CheckedContinuation<[NFCNDEFMessage], Error>) in
             cont = c
             let s = NFCNDEFReaderSession(delegate: self, queue: nil, invalidateAfterFirstRead: true)

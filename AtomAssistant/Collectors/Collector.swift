@@ -19,12 +19,10 @@ enum Collectors {
         let list: [Collector] = [
             DeviceStatusCollector(), SystemCollector(), NetworkCollector(),
             PedometerCollector(), ActivityCollector(),
-            HealthSummaryCollector(),
-            NowPlayingCollector(),
             FocusCollector(),
             BluetoothScanCollector(), NetworkScanCollector(),
             CoarseLocationCollector(), LocationNowCollector(), LocationTrackCollector(),
-            HealthQueryCollector(), MotionQueryCollector(), NFCReadCollector(),
+            MotionQueryCollector(), NFCReadCollector(),
         ]
         return Dictionary(uniqueKeysWithValues: list.map { ($0.kind, $0) })
     }()

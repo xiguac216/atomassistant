@@ -5,6 +5,8 @@ struct SettingsView: View {
     @EnvironmentObject var model: AppModel
     @State private var confirmUnpair = false
 
+    private var backgroundRefreshOn: Bool { UIApplication.shared.backgroundRefreshStatus == .available }
+
     var body: some View {
         NavigationStack {
             List {
@@ -16,41 +18,23 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Toggle(isOn: Binding(get: { model.keepAlive }, set: { model.setKeepAlive($0) })) {
-                        HStack(spacing: 12) {
-                            IconTile(symbol: "bolt.horizontal.fill", tint: .green)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("后台保活").font(.system(size: 16))
-                                Text("循环播放静音，让 App 一直在后台同步").font(.footnote).foregroundStyle(.secondary)
-                            }
+                    HStack(spacing: 12) {
+                        IconTile(symbol: "arrow.triangle.2.circlepath", tint: backgroundRefreshOn ? .green : .orange)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("后台同步").font(.system(size: 16))
+                            Text(backgroundRefreshOn ? "已开启：系统会在合适的时候唤醒 App 同步" : "「后台 App 刷新」是关的，切到后台后不会同步")
+                                .font(.footnote).foregroundStyle(.secondary)
                         }
                     }
-                    if let e = model.keepAliveError {
-                        Label(e, systemImage: "exclamationmark.triangle.fill").font(.footnote).foregroundStyle(.orange)
-                    }
-                    Toggle(isOn: Binding(get: { model.wakeOnMove }, set: { model.setWakeOnMove($0) })) {
-                        HStack(spacing: 12) {
-                            IconTile(symbol: "location.circle.fill", tint: .blue)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("移动时唤醒").font(.system(size: 16))
-                                Text("被系统杀掉后，移动约 500 米会重新拉起").font(.footnote).foregroundStyle(.secondary)
-                            }
+                    if !backgroundRefreshOn {
+                        Button("打开系统设置") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
                         }
-                    }
-                    if model.wakeOnMove && BackgroundKeeper.shared.wakeAuthorization != .authorizedAlways {
-                        Label("还没有「始终允许」定位权限，移动时唤醒不会生效。请到 设置 → 隐私与安全性 → 定位服务 → 原子助手 改成「始终」。",
-                              systemImage: "exclamationmark.triangle.fill")
-                            .font(.footnote).foregroundStyle(.orange)
-                    }
-                    if UIApplication.shared.backgroundRefreshStatus != .available {
-                        Label("系统的「后台 App 刷新」是关的，请到 设置 → 通用 → 后台 App 刷新 打开。",
-                              systemImage: "exclamationmark.triangle.fill")
-                            .font(.footnote).foregroundStyle(.orange)
                     }
                 } header: {
                     Text("后台运行")
                 } footer: {
-                    Text("后台保活会多耗一点电。位置唤醒只把位置变化当作叫醒信号，不读取、不上传位置。你手动划掉 App 之后，系统基本不会再拉起它。")
+                    Text("切到后台后，同步完全依赖系统的「后台 App 刷新」（设置 → 通用 → 后台 App 刷新）。系统自己决定什么时候唤醒，通常一天只有有限的几次，不保证按你设的间隔；想要最新的数据，打开 App 就会立刻同步一次。你手动划掉 App 之后系统不会再唤醒它。")
                 }
 
                 Section {

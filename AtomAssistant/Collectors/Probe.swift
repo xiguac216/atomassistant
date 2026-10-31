@@ -1,9 +1,7 @@
 import Foundation
 import UIKit
-import HealthKit
 import CoreMotion
 import CoreLocation
-import MediaPlayer
 import Intents
 import UserNotifications
 import CoreNFC
@@ -31,14 +29,6 @@ enum Prober {
         } else {
             out.append(.init(group: "私有接口", name: "MobileGestalt 设备信息", status: .blocked, detail: g.error ?? "未知"))
         }
-        let np = await PrivateAPI.nowPlaying()
-        if let v = np.value {
-            out.append(.init(group: "私有接口", name: "MediaRemote 正在播放", status: .ok, detail: "读到 \(v.count) 个字段：\(v.keys.sorted().joined(separator: "、"))"))
-        } else {
-            // 没在播放和被拦了在这里分不开，所以只说「没拿到」。
-            out.append(.init(group: "私有接口", name: "MediaRemote 正在播放", status: .partial, detail: (np.error ?? "未知") + "。放首歌再探测一次可以区分是没在播还是被拦了"))
-        }
-
         // 公开接口与权限
         out.append(contentsOf: await publicChecks())
         return out
@@ -46,12 +36,6 @@ enum Prober {
 
     private static func publicChecks() async -> [ProbeResult] {
         var r: [ProbeResult] = []
-
-        r.append(.init(group: "公开接口", name: "HealthKit",
-                       status: HKHealthStore.isHealthDataAvailable() ? .partial : .blocked,
-                       detail: HKHealthStore.isHealthDataAvailable()
-                           ? "系统支持。能否读到取决于签名有没有 HealthKit entitlement，在「数据源」里打开健康摘要实测"
-                           : "这台设备不支持"))
 
         let pedo = CMPedometer.isStepCountingAvailable()
         r.append(.init(group: "公开接口", name: "计步", status: pedo ? authStatus(CMPedometer.authorizationStatus() == .authorized, CMPedometer.authorizationStatus() == .notDetermined) : .blocked,
@@ -63,10 +47,6 @@ enum Prober {
         let loc = CLLocationManager().authorizationStatus
         r.append(.init(group: "公开接口", name: "定位", status: authStatus(loc == .authorizedWhenInUse || loc == .authorizedAlways, loc == .notDetermined),
                        detail: "权限：" + locAuth(loc)))
-
-        let lib = MPMediaLibrary.authorizationStatus()
-        r.append(.init(group: "公开接口", name: "音乐库", status: authStatus(lib == .authorized, lib == .notDetermined),
-                       detail: "权限：" + (lib == .authorized ? "已授权" : lib == .notDetermined ? "未询问" : "被拒绝或受限")))
 
         let focus = INFocusStatusCenter.default.authorizationStatus
         r.append(.init(group: "公开接口", name: "专注模式状态", status: authStatus(focus == .authorized, focus == .notDetermined),

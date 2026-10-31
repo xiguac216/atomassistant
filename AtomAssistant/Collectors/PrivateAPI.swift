@@ -1,8 +1,8 @@
 import Foundation
 import UIKit
 
-/// 私有接口。实测在这台手机上能用的只有 MobileGestalt 的一部分键，MediaRemote 还待复测；
-/// 其余（电池详情、已安装应用等）被系统拦了，已经删掉。
+/// 私有接口。实测在这台手机上能用的只有 MobileGestalt 的一部分键；
+/// 其余（电池详情、已安装应用、正在播放等）被系统拦了，已经删掉。
 ///
 /// 没有头文件，全靠 dlopen / dlsym / ObjC 运行时在运行期找；找不到、没权限、返回空都不是错误，
 /// 只是这台手机上拿不到——「能力探测」页会把每一项实测的结果列出来。
@@ -41,44 +41,5 @@ enum PrivateAPI {
             out[k] = JSON.clean(obj)
         }
         return .init(value: out.isEmpty ? nil : out, error: out.isEmpty ? "所有键都返回空（被系统拦了）" : nil)
-    }
-
-    // MARK: MediaRemote：正在播放（任意 App，不止音乐）
-
-    private typealias MRInfoFn = @convention(c) (DispatchQueue, @escaping @convention(block) (CFDictionary?) -> Void) -> Void
-    private typealias MRBoolFn = @convention(c) (DispatchQueue, @escaping @convention(block) (Bool) -> Void) -> Void
-
-    private static func mediaRemote() -> UnsafeMutableRawPointer? {
-        dlopen("/System/Library/PrivateFrameworks/MediaRemote.framework/MediaRemote", RTLD_NOW)
-    }
-
-    static func nowPlaying() async -> Outcome<[String: Any]> {
-        guard let h = mediaRemote() else { return .init(value: nil, error: "dlopen MediaRemote 失败") }
-        guard let sym = dlsym(h, "MRMediaRemoteGetNowPlayingInfo") else { return .init(value: nil, error: "找不到 MRMediaRemoteGetNowPlayingInfo") }
-        let fn = unsafeBitCast(sym, to: MRInfoFn.self)
-
-        let info: [String: Any]? = await callbackWithTimeout(3, fallback: nil) { done in
-            fn(DispatchQueue.main) { dict in
-                guard let dict = dict as? [String: Any] else { done(nil); return }
-                var out: [String: Any] = [:]
-                for (k, v) in dict {
-                    // 封面是二进制大图，不要。
-                    if v is Data { continue }
-                    out[k.replacingOccurrences(of: "kMRMediaRemoteNowPlayingInfo", with: "")] = JSON.clean(v)
-                }
-                done(out)
-            }
-        }
-        guard var result = info else { return .init(value: nil, error: "超时或没有权限（没有回调）") }
-        if result.isEmpty { return .init(value: nil, error: "回调了但内容为空：现在没在播放，或被系统拦了") }
-
-        if let s = dlsym(h, "MRMediaRemoteGetNowPlayingApplicationIsPlaying") {
-            let f = unsafeBitCast(s, to: MRBoolFn.self)
-            let playing: Bool? = await callbackWithTimeout(2, fallback: nil) { done in
-                f(DispatchQueue.main) { done($0) }
-            }
-            if let playing { result["IsPlaying"] = playing }
-        }
-        return .init(value: result, error: nil)
     }
 }

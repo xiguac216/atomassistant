@@ -31,13 +31,10 @@ enum Readable {
         case .deviceNetwork: return network(p)
         case .motionPedometer: return pedometer(p)
         case .motionActivity: return activity(p)
-        case .healthSummary: return healthSummary(p)
-        case .mediaNowPlaying: return nowPlaying(p)
         case .focusStatus: return [.init(label: "专注模式", value: yesNo(p["isFocused"], yes: "开启", no: "关闭"))]
         case .locationCoarse: return coarse(p)
         case .locationNow: return location(p)
         case .locationTrack: return track(samples)
-        case .healthQuery: return perDay(samples, healthDay)
         case .motionQuery: return perDay(samples, motionDay)
         case .nfcRead: return nfc(p)
         case .bluetoothScan: return bluetooth(p)
@@ -184,58 +181,8 @@ enum Readable {
 
     // MARK: 健康
 
-    private static let healthNames: [(String, String, String)] = [
-        ("steps", "步数", "步"), ("distanceMeters", "步行跑步距离（米）", ""), ("activeEnergyKcal", "活动能量", "千卡"),
-        ("flightsClimbed", "爬楼", "层"), ("exerciseMinutes", "锻炼", "分钟"), ("standMinutes", "站立", "分钟"),
-    ]
-
-    private static let latestNames: [String: (String, String)] = [
-        "heartRate": ("心率", "次/分"), "restingHeartRate": ("静息心率", "次/分"), "walkingHeartRate": ("步行心率", "次/分"),
-        "heartRateVariabilityMs": ("心率变异性", "毫秒"), "oxygenSaturation": ("血氧", ""), "respiratoryRate": ("呼吸率", "次/分"),
-        "bodyMassKg": ("体重", "公斤"), "vo2Max": ("最大摄氧量", ""),
-    ]
-
-    private static func healthSummary(_ p: [String: Any]) -> [ReadingRow] {
-        var rows: [ReadingRow] = []
-        for (key, label, unit) in healthNames {
-            if let v = num(p[key]) { rows.append(.init(label: label, value: "\(fmt(v, v < 100 ? 1 : 0)) \(unit)".trimmingCharacters(in: .whitespaces))) }
-        }
-        if let latest = p["latest"] as? [String: Any] {
-            for (key, entry) in latest.sorted(by: { $0.key < $1.key }) {
-                guard let e = entry as? [String: Any], let v = num(e["value"]), let (label, unit) = latestNames[key] else { continue }
-                let shown = key == "oxygenSaturation" ? "\(fmt(v * 100, 0))%" : "\(fmt(v, 1)) \(unit)"
-                let when = date(e["at"]).map { "（\(timeFmt.string(from: $0))）" } ?? ""
-                rows.append(.init(label: label, value: shown + when))
-            }
-        }
-        if let sleep = p["sleepLast36hHours"] as? [String: Any] {
-            let names = ["inBed": "在床", "awake": "清醒", "core": "核心睡眠", "deep": "深度睡眠", "rem": "REM", "asleepUnspecified": "睡眠"]
-            for (k, v) in sleep.sorted(by: { $0.key < $1.key }) {
-                if let h = num(v) { rows.append(.init(label: "睡眠·\(names[k] ?? k)", value: "\(fmt(h, 1)) 小时")) }
-            }
-        }
-        if let w = p["workoutsLast7d"] as? [[String: Any]] { rows.append(.init(label: "近 7 天体能训练", value: "\(w.count) 次")) }
-        if rows.isEmpty { rows.append(.init(label: "健康", value: "没有读到数据")) }
-        return rows
-    }
-
     private static func perDay(_ samples: [Sample], _ f: ([String: Any]) -> String) -> [ReadingRow] {
         samples.map { ReadingRow(label: str($0.payload["date"]) ?? "", value: f($0.payload)) }
-    }
-
-    private static func healthDay(_ p: [String: Any]) -> String {
-        var parts: [String] = []
-        if let v = num(p["steps"]) { parts.append("\(Int(v)) 步") }
-        if let v = num(p["distanceMeters"]) { parts.append("\(fmt(v / 1000, 1)) 公里") }
-        if let v = num(p["activeEnergyKcal"]) { parts.append("\(Int(v)) 千卡") }
-        if let s = p["stats"] as? [String: Any], let hr = s["heartRate"] as? [String: Any], let a = num(hr["avg"]) {
-            parts.append("心率均值 \(Int(a))")
-        }
-        if let sl = p["sleepHours"] as? [String: Any] {
-            let asleep = ["core", "deep", "rem", "asleepUnspecified"].compactMap { num(sl[$0]) }.reduce(0, +)
-            if asleep > 0 { parts.append("睡眠 \(fmt(asleep, 1)) 小时") }
-        }
-        return parts.isEmpty ? "无数据" : parts.joined(separator: " · ")
     }
 
     private static func motionDay(_ p: [String: Any]) -> String {
@@ -245,31 +192,6 @@ enum Readable {
         if let v = num(p["floorsAscended"]) { parts.append("爬 \(Int(v)) 层") }
         if let segs = p["segments"] as? [[String: Any]] { parts.append("\(segs.count) 段活动") }
         return parts.isEmpty ? "无数据" : parts.joined(separator: " · ")
-    }
-
-    // MARK: 媒体与专注
-
-    private static func nowPlaying(_ p: [String: Any]) -> [ReadingRow] {
-        if let info = p["info"] as? [String: Any] {
-            let playing = bool(info["IsPlaying"])
-            return compact([
-                row("来源", "MediaRemote（任意 App）"),
-                row("歌名", str(info["Title"])), row("歌手", str(info["Artist"])), row("专辑", str(info["Album"])),
-                row("时长", num(info["Duration"]).map { "\(Int($0)) 秒" }),
-                row("进度", num(info["ElapsedTime"]).map { "\(Int($0)) 秒" }),
-                row("正在播放", playing.map { $0 ? "是" : "否" }),
-            ])
-        }
-        if let m = p["musicApp"] as? [String: Any] {
-            return compact([
-                row("来源", "「音乐」App"), row("歌名", str(m["title"])), row("歌手", str(m["artist"])),
-                row("状态", str(m["state"])),
-            ])
-        }
-        return compact([
-            row("正在播放", "没有读到"),
-            row("私有接口", str(p["mediaRemoteError"])),
-        ])
     }
 
     // MARK: 位置
