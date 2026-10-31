@@ -114,7 +114,7 @@ struct NetworkCollector: Collector {
         let now = Date()
         var p: [String: Any] = [:]
 
-        let path: NWPath? = await callbackWithTimeout(3, fallback: nil) { done in
+        let path: Network.NWPath? = await callbackWithTimeout(3, fallback: nil) { done in
             let monitor = NWPathMonitor()
             monitor.pathUpdateHandler = { path in
                 monitor.cancel()
