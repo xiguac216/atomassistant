@@ -23,7 +23,7 @@ enum Collectors {
             NowPlayingCollector(),
             FocusCollector(),
             BluetoothScanCollector(), NetworkScanCollector(),
-            LocationCoarseCollector(), LocationNowCollector(), LocationTrackCollector(),
+            CoarseLocationCollector(), LocationNowCollector(), LocationTrackCollector(),
             HealthQueryCollector(), MotionQueryCollector(), NFCReadCollector(),
         ]
         return Dictionary(uniqueKeysWithValues: list.map { ($0.kind, $0) })
