@@ -6,8 +6,7 @@ struct SourcesView: View {
     @State private var working: Set<String> = []
 
     var body: some View {
-        NavigationStack {
-            List {
+        List {
                 Section {
                     ForEach(DataKind.continuous) { kind in
                         row(kind)
@@ -36,14 +35,13 @@ struct SourcesView: View {
                     Text("这些最私人的数据不会自动上报。助手需要时会在「授权」里问你，你同意了才采集。")
                 }
             }
-            .listStyle(.insetGrouped)
-            .navigationTitle("数据源")
-            .navigationDestination(for: DataKind.self) { SourceDetailView(kind: $0) }
-            .alert("无法开启", isPresented: Binding(get: { alertText != nil }, set: { if !$0 { alertText = nil } })) {
-                Button("好") {}
-            } message: {
-                Text(alertText ?? "")
-            }
+        .listStyle(.insetGrouped)
+        .navigationTitle("数据源")
+        .navigationDestination(for: DataKind.self) { SourceDetailView(kind: $0) }
+        .alert("无法开启", isPresented: Binding(get: { alertText != nil }, set: { if !$0 { alertText = nil } })) {
+            Button("好") {}
+        } message: {
+            Text(alertText ?? "")
         }
     }
 

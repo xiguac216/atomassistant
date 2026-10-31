@@ -39,6 +39,17 @@ struct SettingsView: View {
 
                 Section {
                     NavigationLink {
+                        SourcesView()
+                    } label: {
+                        HStack(spacing: 12) {
+                            IconTile(symbol: "antenna.radiowaves.left.and.right", tint: .green)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("数据源").font(.system(size: 16))
+                                Text("选择这台手机上报哪些数据").font(.footnote).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    NavigationLink {
                         LiveView()
                     } label: {
                         HStack(spacing: 12) {

@@ -33,8 +33,8 @@ struct MainTabView: View {
                 .tabItem { Label("授权", systemImage: "hand.raised.fill") }
                 .badge(model.requests.count)
                 .tag(2)
-            SourcesView()
-                .tabItem { Label("数据源", systemImage: "antenna.radiowaves.left.and.right") }
+            ManageView()
+                .tabItem { Label("管理", systemImage: "slider.horizontal.3") }
                 .tag(3)
             SettingsView()
                 .tabItem { Label("设置", systemImage: "gearshape.fill") }

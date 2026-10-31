@@ -35,7 +35,7 @@ struct AdminOverview: Decodable {
     let assistantProblem: String?
     let waiting: Int
     let active: Int
-    let recent: [AdminTask]
+    let recent: [AdminTask]?
     let vaultRequests: Int?
     let memoryPending: Int?
     let todayTokens: Int?
@@ -223,6 +223,41 @@ final class AdminStore: ObservableObject {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+
+    // MARK: 通用页面（后台的其他功能）
+
+    /// 取一个页面的界面描述。/_hub 是「管理」首页。
+    func loadPage(_ path: String) async throws -> UIPage {
+        if path == "/_hub" { return try await call(UIPage.self, "GET", "hub") }
+        return try await call(UIPage.self, "GET", "page?path=\(Self.escape(path))")
+    }
+
+    /// 执行一个写操作。extra 是表单里填的内容，和动作自带的隐藏字段合在一起提交。
+    func perform(_ a: UIAction, extra: [String: [String]]) async throws -> ActionResult {
+        let form = a.form.merging(extra) { $0 + $1 }
+        return try await call(ActionResult.self, "POST", "do", body: ["path": a.path, "form": form])
+    }
+
+    func upload(data: Data, filename: String, mime: String) async throws -> ActionResult {
+        guard let client = AppModel.shared.client else { throw AdminError("还没有配对") }
+        let boundary = "atom-" + UUID().uuidString
+        var body = Data()
+        let safeName = filename.replacingOccurrences(of: "\"", with: "_")
+        body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"\(safeName)\"\r\nContent-Type: \(mime)\r\n\r\n".utf8))
+        body.append(data)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
+        let out = try await client.appUpload(body: body, boundary: boundary)
+        return try Self.decoder.decode(ActionResult.self, from: out)
+    }
+
+    func download(_ raw: String) async throws -> Data {
+        try await send("GET", "raw?path=\(Self.escape(raw))")
+    }
+
+    /// 把一个站内路径整个编码，放进查询参数里（连 ? & = 都要编码）。
+    private static func escape(_ s: String) -> String {
+        s.addingPercentEncoding(withAllowedCharacters: CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))) ?? s
     }
 
     func detail(_ id: String) async throws -> AdminTaskDetail {

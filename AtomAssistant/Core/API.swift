@@ -25,7 +25,7 @@ struct APIClient {
         return URLSession(configuration: c)
     }()
 
-    fileprivate func request(_ method: String, _ path: String, body: Data? = nil, prefix: String = "api/device/v1/") async throws -> Data {
+    fileprivate func request(_ method: String, _ path: String, body: Data? = nil, prefix: String = "api/device/v1/", contentType: String = "application/json") async throws -> Data {
         guard let url = URL(string: prefix + path, relativeTo: base) else {
             throw APIError.transport("地址不对")
         }
@@ -34,7 +34,7 @@ struct APIClient {
         if let token { req.setValue("Bearer " + token, forHTTPHeaderField: "Authorization") }
         if let body {
             req.httpBody = body
-            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.setValue(contentType, forHTTPHeaderField: "Content-Type")
         }
         let data: Data
         let resp: URLResponse
@@ -142,5 +142,10 @@ extension APIClient {
     /// 手机管理接口（/api/app/v1/）：需要后台给这台手机打开了「允许管理后台」。
     func appRequest(_ method: String, _ path: String, body: Data? = nil) async throws -> Data {
         try await request(method, path, body: body, prefix: "api/app/v1/")
+    }
+
+    /// 上传文件到工作区（multipart）。
+    func appUpload(body: Data, boundary: String) async throws -> Data {
+        try await request("POST", "upload", body: body, prefix: "api/app/v1/", contentType: "multipart/form-data; boundary=\(boundary)")
     }
 }
