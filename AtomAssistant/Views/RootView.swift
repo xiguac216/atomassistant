@@ -33,9 +33,21 @@ struct MainTabView: View {
             SourcesView()
                 .tabItem { Label("数据源", systemImage: "antenna.radiowaves.left.and.right") }
                 .tag(2)
+            LiveView()
+                .tabItem { Label("实测", systemImage: "checklist") }
+                .tag(3)
             SettingsView()
                 .tabItem { Label("设置", systemImage: "gearshape.fill") }
-                .tag(3)
+                .tag(4)
+        }
+        // 助手要读 NFC 标签：打开 App 就弹出这一页，并立刻亮出系统的读取框。
+        .sheet(item: $model.nfcAutoRequest) { r in
+            NavigationStack {
+                RequestDetailView(request: r, autoStart: true)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) { Button("关闭") { model.nfcAutoRequest = nil } }
+                    }
+            }
         }
     }
 }

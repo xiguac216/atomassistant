@@ -39,6 +39,12 @@ final class AppModel: ObservableObject {
     @Published private(set) var keepAlive = Defaults.keepAlive
     @Published private(set) var wakeOnMove = Defaults.wakeOnMove
     @Published private(set) var keepAliveError: String?
+    /// 上报间隔（分钟）：在后台给这台手机设置，每次同步时从服务器读取。
+    @Published private(set) var syncMinutes = Defaults.syncMinutes
+
+    /// 有等待读取的 NFC 需求时，打开 App 就自动弹出读取框，由这个属性驱动界面。
+    @Published var nfcAutoRequest: PendingRequest?
+    private var nfcOffered: Set<String> = []
 
     /// 从二维码或链接里带来的、等待确认的配对信息。
     @Published var incomingPairing: (server: String, code: String)?
@@ -144,6 +150,8 @@ final class AppModel: ObservableObject {
         fulfil = [:]
         fulfilCache = [:]
         knownRequestIDs = []
+        nfcOffered = []
+        nfcAutoRequest = nil
         setBadge(0)
     }
 
@@ -294,13 +302,24 @@ final class AppModel: ObservableObject {
     func refreshRequests() async {
         guard let client else { return }
         do {
-            let list = try await client.pendingRequests()
+            let (list, minutes) = try await client.pendingRequests()
+            if let m = minutes, m > 0, m != syncMinutes {
+                syncMinutes = m
+                Defaults.syncMinutes = m
+                log("上报间隔改为每 \(m) 分钟（后台设置）")
+            }
             let fresh = list.filter { !knownRequestIDs.contains($0.id) }
             knownRequestIDs = Set(list.map(\.id))
             requests = list.sorted { $0.expiresAt < $1.expiresAt }
             setBadge(list.count)
             if !fresh.isEmpty, UIApplication.shared.applicationState != .active {
                 notify(fresh)
+            }
+            // 你就是为了读标签才打开 App 的：App 在前台时直接弹出读取框，每条需求只弹一次，取消了就不再自动弹。
+            if UIApplication.shared.applicationState == .active, nfcAutoRequest == nil,
+               let nfc = list.first(where: { $0.kind == DataKind.nfcRead.rawValue && !nfcOffered.contains($0.id) }) {
+                nfcOffered.insert(nfc.id)
+                nfcAutoRequest = nfc
             }
         } catch APIError.unauthorized {
             markTokenInvalid()
@@ -313,8 +332,11 @@ final class AppModel: ObservableObject {
     static func params(of r: PendingRequest) -> [String: Any] {
         var p: [String: Any] = [:]
         if let m = r.number("minutes") { p["minutes"] = m }
+        if let sec = r.number("seconds") { p["seconds"] = sec }
         if let f = r.date("from") { p["from"] = f }
         if let t = r.date("to") { p["to"] = t }
+        // 读取框上要显示的提示，用助手写的原因。
+        p["reason"] = r.reason
         return p
     }
 
@@ -468,13 +490,15 @@ final class AppModel: ObservableObject {
 
     // MARK: 前台循环与后台刷新
 
-    /// 每 5 分钟同步一次。在前台一直跑；开了后台保活时切到后台也继续。
+    /// 按后台设置的间隔同步。在前台一直跑；开了后台保活时切到后台也继续。
     func startLoop() {
         guard loop == nil else { return }
         loop = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.syncNow()
-                try? await Task.sleep(nanoseconds: 300 * 1_000_000_000)
+                // 间隔由后台设置，每一轮都读最新的。
+                let minutes = self?.syncMinutes ?? 20
+                try? await Task.sleep(nanoseconds: UInt64(minutes) * 60 * 1_000_000_000)
             }
         }
     }
@@ -503,10 +527,11 @@ enum BackgroundSync {
         }
     }
 
-    /// 请系统在 15 分钟之后的合适时机唤醒一次。系统不保证准时，也不保证一定会来。
+    /// 请系统在间隔之后的合适时机唤醒一次。系统不保证准时，也不保证一定会来。
     static func schedule() {
         let req = BGAppRefreshTaskRequest(identifier: identifier)
-        req.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        // 系统本来也不会比 15 分钟更勤；后台设了更长的间隔就按它来。
+        req.earliestBeginDate = Date(timeIntervalSinceNow: Double(max(15, Defaults.syncMinutes)) * 60)
         do {
             try BGTaskScheduler.shared.submit(req)
         } catch {

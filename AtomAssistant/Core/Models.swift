@@ -9,20 +9,23 @@ enum DataKind: String, CaseIterable, Identifiable, Codable {
     case motionActivity = "motion.activity"
     case healthSummary = "health.summary"
     case mediaNowPlaying = "media.nowplaying"
-    case mediaLibrary = "media.library"
     case focusStatus = "focus.status"
     case probeReport = "probe.report"
+    case locationCoarse = "location.coarse"
     case locationNow = "location.now"
     case locationTrack = "location.track"
     case healthQuery = "health.query"
     case motionQuery = "motion.query"
+    case nfcRead = "nfc.read"
+    case bluetoothScan = "bluetooth.scan"
+    case networkScan = "network.scan"
 
     var id: String { rawValue }
 
     /// 为真表示每次采集都要用户点同意，只能挂在授权需求上上报。
     var perUse: Bool {
         switch self {
-        case .locationNow, .locationTrack, .healthQuery, .motionQuery: return true
+        case .locationNow, .locationTrack, .healthQuery, .motionQuery, .nfcRead, .bluetoothScan, .networkScan: return true
         default: return false
         }
     }
@@ -39,13 +42,16 @@ enum DataKind: String, CaseIterable, Identifiable, Codable {
         case .motionActivity: return "运动状态"
         case .healthSummary: return "健康摘要"
         case .mediaNowPlaying: return "正在播放"
-        case .mediaLibrary: return "音乐库"
         case .focusStatus: return "专注模式"
         case .probeReport: return "能力探测"
+        case .locationCoarse: return "粗略位置"
         case .locationNow: return "当前位置"
         case .locationTrack: return "位置轨迹"
         case .healthQuery: return "健康记录"
         case .motionQuery: return "运动历史"
+        case .nfcRead: return "NFC 标签"
+        case .bluetoothScan: return "蓝牙扫描"
+        case .networkScan: return "局域网扫描"
         }
     }
 
@@ -58,13 +64,16 @@ enum DataKind: String, CaseIterable, Identifiable, Codable {
         case .motionActivity: return "静止、步行、跑步、骑行、驾车"
         case .healthSummary: return "步数、心率、睡眠、活动能量等"
         case .mediaNowPlaying: return "歌名、歌手、来源应用"
-        case .mediaLibrary: return "歌曲数量与最近播放"
         case .focusStatus: return "专注模式是否开启"
         case .probeReport: return "哪些系统接口在这台手机上可用"
+        case .locationCoarse: return "精确位置随机偏移 10–20 公里后的大致位置和城市"
         case .locationNow: return "此刻的位置"
         case .locationTrack: return "一段时间内的移动轨迹"
         case .healthQuery: return "指定时间段的详细健康记录"
         case .motionQuery: return "指定时间段的计步与运动历史"
+        case .nfcRead: return "打开 App 后把手机靠近标签，读取里面的内容"
+        case .bluetoothScan: return "扫描附近的蓝牙设备（名称、信号强度）"
+        case .networkScan: return "扫描当前 Wi-Fi 里在线的设备和它们的服务"
         }
     }
 
@@ -77,13 +86,16 @@ enum DataKind: String, CaseIterable, Identifiable, Codable {
         case .motionActivity: return "figure.run"
         case .healthSummary: return "heart.fill"
         case .mediaNowPlaying: return "music.note"
-        case .mediaLibrary: return "music.note.list"
         case .focusStatus: return "moon.fill"
         case .probeReport: return "stethoscope"
+        case .locationCoarse: return "location.circle"
         case .locationNow: return "location.fill"
         case .locationTrack: return "point.topleft.down.curvedto.point.bottomright.up"
         case .healthQuery: return "waveform.path.ecg"
         case .motionQuery: return "chart.line.uptrend.xyaxis"
+        case .nfcRead: return "wave.3.right.circle.fill"
+        case .bluetoothScan: return "dot.radiowaves.left.and.right"
+        case .networkScan: return "network"
         }
     }
 
@@ -94,10 +106,13 @@ enum DataKind: String, CaseIterable, Identifiable, Codable {
         case .deviceNetwork: return .blue
         case .motionPedometer, .motionActivity, .motionQuery: return .orange
         case .healthSummary, .healthQuery: return .pink
-        case .mediaNowPlaying, .mediaLibrary: return .red
+        case .mediaNowPlaying: return .red
         case .focusStatus: return .purple
         case .probeReport: return .teal
-        case .locationNow, .locationTrack: return .blue
+        case .locationCoarse, .locationNow, .locationTrack: return .blue
+        case .nfcRead: return .mint
+        case .bluetoothScan: return .blue
+        case .networkScan: return .teal
         }
     }
 }
@@ -131,6 +146,7 @@ struct PendingRequest: Codable, Identifiable, Equatable {
         guard let params, !params.isEmpty else { return nil }
         var parts: [String] = []
         if let m = number("minutes") { parts.append("持续 \(Int(m)) 分钟") }
+        if let sec = number("seconds") { parts.append("扫描 \(Int(sec)) 秒") }
         if let f = params["from"]?.string, let t = params["to"]?.string {
             parts.append("\(f.prefix(10)) 至 \(t.prefix(10))")
         }

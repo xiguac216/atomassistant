@@ -82,13 +82,18 @@ enum Defaults {
         get { d.bool(forKey: "wakeOnMove") }
         set { d.set(newValue, forKey: "wakeOnMove") }
     }
+    /// 后台里给这台手机设的上报间隔（分钟），每次同步时从服务器更新。
+    static var syncMinutes: Int {
+        get { d.integer(forKey: "syncMinutes") > 0 ? d.integer(forKey: "syncMinutes") : 20 }
+        set { d.set(newValue, forKey: "syncMinutes") }
+    }
     static var lastSync: Date? {
         get { d.object(forKey: "lastSync") as? Date }
         set { d.set(newValue, forKey: "lastSync") }
     }
 
     static func clearAll() {
-        for k in ["serverURL", "deviceName", "enabledKinds", "lastUpload", "uploadCount", "lastSync", "keepAlive", "wakeOnMove"] {
+        for k in ["serverURL", "deviceName", "enabledKinds", "lastUpload", "uploadCount", "lastSync", "keepAlive", "wakeOnMove", "syncMinutes"] {
             d.removeObject(forKey: k)
         }
     }

@@ -56,6 +56,23 @@ targets:
         NSLocationWhenInUseUsageDescription: 只在你同意某次授权需求时读取位置，发给你自己的助手。
         NSLocationAlwaysAndWhenInUseUsageDescription: 只在你同意某次授权需求时读取位置，发给你自己的助手。
         NSAppleMusicUsageDescription: 读取音乐库摘要，上报给你自己的助手。
+        NFCReaderUsageDescription: 助手需要读取一个 NFC 标签时，你把手机靠近标签，内容只发给你自己的服务器。
+        NSBluetoothAlwaysUsageDescription: 助手需要扫描附近的蓝牙设备时，你同意后才会扫描，结果只发给你自己的服务器。
+        NSLocalNetworkUsageDescription: 助手需要扫描当前局域网里的设备时，你同意后才会扫描，结果只发给你自己的服务器。
+        NSBonjourServices:
+          - _http._tcp
+          - _https._tcp
+          - _airplay._tcp
+          - _raop._tcp
+          - _hap._tcp
+          - _ipp._tcp
+          - _printer._tcp
+          - _smb._tcp
+          - _ssh._tcp
+          - _googlecast._tcp
+          - _companion-link._tcp
+          - _device-info._tcp
+        NSContactsUsageDescription: 只在「能力探测」里统计通讯录有没有带地址的名片，不读取也不上传内容。
         NSFocusStatusUsageDescription: 读取专注模式是否开启，上报给你自己的助手。
     dependencies:
       - sdk: HealthKit.framework
@@ -67,3 +84,6 @@ targets:
       - sdk: BackgroundTasks.framework
       - sdk: UserNotifications.framework
       - sdk: CoreTelephony.framework
+      - sdk: CoreNFC.framework
+      - sdk: CoreBluetooth.framework
+      - sdk: Contacts.framework

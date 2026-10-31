@@ -39,13 +39,6 @@ struct DeviceStatusCollector: Collector {
         }
         p["screenBrightness"] = Double(UIScreen.main.brightness)
 
-        if let v = try? URL(fileURLWithPath: NSHomeDirectory()).resourceValues(forKeys: [
-            .volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey,
-        ]) {
-            if let t = v.volumeTotalCapacity { p["storageTotalBytes"] = t }
-            if let a = v.volumeAvailableCapacityForImportantUsage { p["storageAvailableBytes"] = a }
-        }
-
         let session = AVAudioSession.sharedInstance()
         p["outputVolume"] = Double(session.outputVolume)
         p["audioOutputs"] = session.currentRoute.outputs.map { ["type": $0.portType.rawValue, "name": $0.portName] }
@@ -67,13 +60,6 @@ struct SystemCollector: Collector {
         p["modelIdentifier"] = Self.machine()
         p["systemName"] = await MainActor.run { UIDevice.current.systemName }
         p["systemVersion"] = await MainActor.run { UIDevice.current.systemVersion }
-        p["physicalMemoryBytes"] = ProcessInfo.processInfo.physicalMemory
-        p["cpuCores"] = ProcessInfo.processInfo.processorCount
-        p["uptimeSeconds"] = ProcessInfo.processInfo.systemUptime
-        p["locale"] = Locale.current.identifier
-        p["timeZone"] = TimeZone.current.identifier
-        p["languages"] = Locale.preferredLanguages
-        if let boot = Self.bootTime() { p["bootTime"] = boot }
 
         let g = PrivateAPI.gestalt()
         if let v = g.value { p["gestalt"] = v } else if let e = g.error { p["gestaltError"] = e }
@@ -87,14 +73,6 @@ struct SystemCollector: Collector {
         return withUnsafeBytes(of: &u.machine) { raw in
             String(cString: raw.bindMemory(to: CChar.self).baseAddress!)
         }
-    }
-
-    private static func bootTime() -> Date? {
-        var tv = timeval()
-        var size = MemoryLayout<timeval>.stride
-        var mib: [Int32] = [CTL_KERN, KERN_BOOTTIME]
-        guard sysctl(&mib, UInt32(mib.count), &tv, &size, nil, 0) == 0 else { return nil }
-        return Date(timeIntervalSince1970: TimeInterval(tv.tv_sec))
     }
 }
 

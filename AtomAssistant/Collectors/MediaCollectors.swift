@@ -8,7 +8,15 @@ import Intents
 struct NowPlayingCollector: Collector {
     let kind = DataKind.mediaNowPlaying
 
-    func authorize() async -> String? { nil }
+    /// 读「音乐」App 的播放状态要媒体库权限；被拒绝也不影响 MediaRemote 那条路，所以不当成失败。
+    func authorize() async -> String? {
+        if MPMediaLibrary.authorizationStatus() == .notDetermined {
+            _ = await withCheckedContinuation { (cont: CheckedContinuation<MPMediaLibraryAuthorizationStatus, Never>) in
+                MPMediaLibrary.requestAuthorization { cont.resume(returning: $0) }
+            }
+        }
+        return nil
+    }
 
     func collect(params: [String: Any]) async throws -> [Sample] {
         let now = Date()
@@ -48,40 +56,6 @@ struct NowPlayingCollector: Collector {
         case .seekingBackward: return "seekingBackward"
         @unknown default: return "unknown"
         }
-    }
-}
-
-// MARK: - 音乐库
-
-struct MediaLibraryCollector: Collector {
-    let kind = DataKind.mediaLibrary
-
-    func authorize() async -> String? {
-        let status = await withCheckedContinuation { (cont: CheckedContinuation<MPMediaLibraryAuthorizationStatus, Never>) in
-            MPMediaLibrary.requestAuthorization { cont.resume(returning: $0) }
-        }
-        return status == .authorized ? nil : "没有「媒体与 Apple Music」权限，请到 设置 → 隐私与安全性 里打开"
-    }
-
-    func collect(params: [String: Any]) async throws -> [Sample] {
-        guard MPMediaLibrary.authorizationStatus() == .authorized else { throw CollectError("没有媒体库权限") }
-        let now = Date()
-        let songs = MPMediaQuery.songs().items ?? []
-        var p: [String: Any] = ["songCount": songs.count]
-        let recent = songs.filter { $0.lastPlayedDate != nil }
-            .sorted { ($0.lastPlayedDate ?? .distantPast) > ($1.lastPlayedDate ?? .distantPast) }
-            .prefix(20)
-        p["recentlyPlayed"] = recent.map { item -> [String: Any] in
-            [
-                "title": item.title ?? "", "artist": item.artist ?? "", "album": item.albumTitle ?? "",
-                "playCount": item.playCount, "lastPlayed": item.lastPlayedDate ?? Date.distantPast,
-            ]
-        }
-        let top = songs.sorted { $0.playCount > $1.playCount }.prefix(10)
-        p["mostPlayed"] = top.map { item -> [String: Any] in
-            ["title": item.title ?? "", "artist": item.artist ?? "", "playCount": item.playCount]
-        }
-        return [Sample(key: bucketKey("lib", seconds: 6 * 3600, at: now), capturedAt: now, payload: p)]
     }
 }
 

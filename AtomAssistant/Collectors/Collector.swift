@@ -20,10 +20,11 @@ enum Collectors {
             DeviceStatusCollector(), SystemCollector(), NetworkCollector(),
             PedometerCollector(), ActivityCollector(),
             HealthSummaryCollector(),
-            NowPlayingCollector(), MediaLibraryCollector(),
+            NowPlayingCollector(),
             FocusCollector(),
-            LocationNowCollector(), LocationTrackCollector(),
-            HealthQueryCollector(), MotionQueryCollector(),
+            BluetoothScanCollector(), NetworkScanCollector(),
+            LocationCoarseCollector(), LocationNowCollector(), LocationTrackCollector(),
+            HealthQueryCollector(), MotionQueryCollector(), NFCReadCollector(),
         ]
         return Dictionary(uniqueKeysWithValues: list.map { ($0.kind, $0) })
     }()

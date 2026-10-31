@@ -77,16 +77,22 @@ struct APIClient {
         _ = try await request("GET", "me")
     }
 
-    func pendingRequests() async throws -> [PendingRequest] {
+    /// 拉取等你处理的授权需求，同时拿到后台给这台手机设的上报间隔（分钟）。
+    func pendingRequests() async throws -> (requests: [PendingRequest], syncMinutes: Int?) {
         let data = try await request("GET", "requests")
-        struct Resp: Decodable { let requests: [PendingRequest] }
+        struct Resp: Decodable {
+            let requests: [PendingRequest]
+            let syncMinutes: Int?
+            enum CodingKeys: String, CodingKey { case requests, syncMinutes = "sync_minutes" }
+        }
         let dec = JSONDecoder()
         dec.dateDecodingStrategy = .custom { d in
             let s = try d.singleValueContainer().decode(String.self)
             if let date = JSON.parseDate(s) { return date }
             throw DecodingError.dataCorrupted(.init(codingPath: d.codingPath, debugDescription: "日期格式不对：\(s)"))
         }
-        return try dec.decode(Resp.self, from: data).requests
+        let r = try dec.decode(Resp.self, from: data)
+        return (r.requests, r.syncMinutes)
     }
 
     /// 上报一批同一种类的数据，返回服务端实际新增的条数。

@@ -15,7 +15,7 @@ struct SourcesView: View {
                 } header: {
                     Text("持续上报")
                 } footer: {
-                    Text("勾选后，App 在前台时每 5 分钟采集一次，系统允许时也会在后台刷新。打开开关时会请求所需的系统权限。")
+                    Text("勾选后，App 按后台设置的间隔采集（现在是每 \(model.syncMinutes) 分钟），系统允许时也会在后台刷新。间隔在服务器后台「手机」页里改。打开开关时会请求所需的系统权限。")
                 }
 
                 Section {

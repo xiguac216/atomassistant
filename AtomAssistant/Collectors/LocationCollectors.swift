@@ -46,8 +46,9 @@ final class LocationSession: NSObject, CLLocationManagerDelegate {
     }
 
     @MainActor
-    func once() async throws -> CLLocation {
-        try await withCheckedThrowingContinuation { cont in
+    func once(accuracy: CLLocationAccuracy = kCLLocationAccuracyBest) async throws -> CLLocation {
+        manager.desiredAccuracy = accuracy
+        return try await withCheckedThrowingContinuation { cont in
             oneCont = cont
             manager.requestLocation()
         }
