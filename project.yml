@@ -68,7 +68,6 @@ targets:
           - _googlecast._tcp
           - _companion-link._tcp
           - _device-info._tcp
-        NSContactsUsageDescription: 只在「能力探测」里统计通讯录有没有带地址的名片，不读取也不上传内容。
         NSFocusStatusUsageDescription: 读取专注模式是否开启，上报给你自己的助手。
     dependencies:
       - sdk: CoreMotion.framework
@@ -80,4 +79,3 @@ targets:
       - sdk: CoreTelephony.framework
       - sdk: CoreNFC.framework
       - sdk: CoreBluetooth.framework
-      - sdk: Contacts.framework

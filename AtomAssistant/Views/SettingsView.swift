@@ -123,27 +123,9 @@ struct ProbeView: View {
     @State private var results: [ProbeResult] = []
     @State private var running = false
     @State private var uploadNote: String?
-    @State private var addressLines: [String] = []
-    @State private var addressRunning = false
 
     var body: some View {
         List {
-            Section {
-                Button {
-                    Haptics.tap()
-                    addressRunning = true
-                    Task { addressLines = await AddressProbe.run().lines; addressRunning = false }
-                } label: {
-                    HStack { Text("探测地址能不能读到"); Spacer(); if addressRunning { ProgressView() } }
-                }
-                .disabled(addressRunning)
-                ForEach(addressLines, id: \.self) { Text($0).font(.footnote) }
-            } header: {
-                Text("家 / 学校地址")
-            } footer: {
-                Text("只统计通讯录里带「家」「学校」「单位」标签的地址有几张名片，不读取、不显示、不上传地址内容。")
-            }
-
             Section {
                 Button {
                     Haptics.tap()
