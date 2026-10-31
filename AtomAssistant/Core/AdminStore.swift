@@ -133,13 +133,14 @@ final class AdminStore: ObservableObject {
     static let shared = AdminStore()
 
     enum Filter: String, CaseIterable, Identifiable {
-        case all, active, ended
+        case all, active, ended, archived
         var id: String { rawValue }
         var title: String {
             switch self {
             case .all: return "全部"
             case .active: return "进行中"
             case .ended: return "已结束"
+            case .archived: return "已归档"
             }
         }
     }
@@ -230,6 +231,7 @@ final class AdminStore: ObservableObject {
     /// 取一个页面的界面描述。/_hub 是「管理」首页。
     func loadPage(_ path: String) async throws -> UIPage {
         if path == "/_hub" { return try await call(UIPage.self, "GET", "hub") }
+        if path == "/_sessions" { return try await call(UIPage.self, "GET", "sessions") }
         return try await call(UIPage.self, "GET", "page?path=\(Self.escape(path))")
     }
 
@@ -269,6 +271,12 @@ final class AdminStore: ObservableObject {
     func create(goal: String) async throws -> String {
         struct R: Decodable { let id: String }
         return try await call(R.self, "POST", "tasks", body: ["goal": goal]).id
+    }
+
+    /// 对一个任务做归档、取消归档或删除（和网页后台任务列表里的批量操作是同一个）。
+    func batch(_ id: String, action: String) async throws {
+        let r = try await call(ActionResult.self, "POST", "do", body: ["path": "/tasks/batch", "form": ["id": [id], "action": [action]]])
+        if !r.ok { throw AdminError(r.message ?? "操作失败") }
     }
 
     func approve(_ id: String) async throws { _ = try await send("POST", "tasks/\(id)/approve") }

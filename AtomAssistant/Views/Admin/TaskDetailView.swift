@@ -14,6 +14,7 @@ struct TaskDetailView: View {
     @State private var showReject = false
     @State private var rejectReason = ""
     @State private var confirmCancel = false
+    @State private var confirmDelete = false
 
     private var current: AdminTask { detail?.task ?? task }
 
@@ -39,18 +40,26 @@ struct TaskDetailView: View {
         .navigationTitle("任务详情")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if current.live {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    if current.live {
                         Button(role: .destructive) { confirmCancel = true } label: { Label("取消这个任务", systemImage: "xmark.circle") }
-                    } label: { Image(systemName: "ellipsis.circle") }
-                }
+                    } else {
+                        Button { tidy("archive", "已归档。") } label: { Label("归档", systemImage: "archivebox") }
+                        Button(role: .destructive) { confirmDelete = true } label: { Label("删除", systemImage: "trash") }
+                    }
+                } label: { Image(systemName: "ellipsis.circle") }
             }
         }
         .confirmationDialog("取消这个任务？", isPresented: $confirmCancel, titleVisibility: .visible) {
             Button("取消任务", role: .destructive) { act("任务已取消。") { try await store.cancel(task.id) } }
         } message: {
             Text("取消后不会再被调度。")
+        }
+        .confirmationDialog("删除这个任务？", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("删除", role: .destructive) { tidy("delete", "已删除。", leave: true) }
+        } message: {
+            Text("连同步骤和记录一起删除，找不回来。")
         }
         .alert("驳回这个动作", isPresented: $showReject) {
             TextField("修改意见（可不填）", text: $rejectReason)
@@ -269,6 +278,23 @@ struct TaskDetailView: View {
             error = nil
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+
+    /// 归档或删除一个已结束的任务。
+    private func tidy(_ action: String, _ done: String, leave: Bool = false) {
+        busy = true
+        Task {
+            defer { busy = false }
+            do {
+                try await store.batch(task.id, action: action)
+                Haptics.success()
+                await store.reload()
+                if leave { dismiss() } else { notice = done; await load() }
+            } catch {
+                self.error = error.localizedDescription
+                Haptics.error()
+            }
         }
     }
 
