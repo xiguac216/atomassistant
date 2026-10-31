@@ -38,10 +38,6 @@ final class AppModel: ObservableObject {
     /// 上报间隔（分钟）：在后台给这台手机设置，每次同步时从服务器读取。
     @Published private(set) var syncMinutes = Defaults.syncMinutes
 
-    /// 有等待读取的 NFC 需求时，打开 App 就自动弹出读取框，由这个属性驱动界面。
-    @Published var nfcAutoRequest: PendingRequest?
-    private var nfcOffered: Set<String> = []
-
     /// 从二维码或链接里带来的、等待确认的配对信息。
     @Published var incomingPairing: (server: String, code: String)?
 
@@ -141,8 +137,6 @@ final class AppModel: ObservableObject {
         fulfil = [:]
         fulfilCache = [:]
         knownRequestIDs = []
-        nfcOffered = []
-        nfcAutoRequest = nil
         setBadge(0)
     }
 
@@ -305,12 +299,6 @@ final class AppModel: ObservableObject {
             setBadge(list.count)
             if !fresh.isEmpty, UIApplication.shared.applicationState != .active {
                 notify(fresh)
-            }
-            // 你就是为了读标签才打开 App 的：App 在前台时直接弹出读取框，每条需求只弹一次，取消了就不再自动弹。
-            if UIApplication.shared.applicationState == .active, nfcAutoRequest == nil,
-               let nfc = list.first(where: { $0.kind == DataKind.nfcRead.rawValue && !nfcOffered.contains($0.id) }) {
-                nfcOffered.insert(nfc.id)
-                nfcAutoRequest = nfc
             }
         } catch APIError.unauthorized {
             markTokenInvalid()

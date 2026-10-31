@@ -40,14 +40,5 @@ struct MainTabView: View {
                 .tabItem { Label("设置", systemImage: "gearshape.fill") }
                 .tag(4)
         }
-        // 助手要读 NFC 标签：打开 App 就弹出这一页，并立刻亮出系统的读取框。
-        .sheet(item: $model.nfcAutoRequest) { r in
-            NavigationStack {
-                RequestDetailView(request: r, autoStart: true)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) { Button("关闭") { model.nfcAutoRequest = nil } }
-                    }
-            }
-        }
     }
 }

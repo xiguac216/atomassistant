@@ -54,7 +54,6 @@ struct LiveView: View {
             Manual(kind: .locationTrack, title: "记录 2 分钟轨迹", params: ["minutes": 2.0]),
             Manual(kind: .bluetoothScan, title: "扫描蓝牙 10 秒", params: ["seconds": 10.0]),
             Manual(kind: .networkScan, title: "扫描局域网", params: ["seconds": 12.0]),
-            Manual(kind: .nfcRead, title: "读取 NFC 标签", params: ["reason": "测试读取"]),
             Manual(kind: .motionQuery, title: "近 7 天运动历史", params: ["from": week, "to": Date()]),
         ]
     }

@@ -46,31 +46,12 @@ jobs:
           zip -qry AtomAssistant.ipa Payload
           ls -lh AtomAssistant.ipa
 
-      - name: 额外产出 NFC 版（带 NFC 读取权限）
-        run: |
-          brew install ldid
-          cat > nfc.entitlements <<'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0"><dict>
-            <key>com.apple.developer.nfc.readersession.formats</key><array><string>NDEF</string></array>
-          </dict></plist>
-          EOF
-          rm -rf PayloadNfc && mkdir PayloadNfc
-          cp -R Payload/AtomAssistant.app PayloadNfc/
-          ldid -Snfc.entitlements PayloadNfc/AtomAssistant.app/AtomAssistant
-          # zip 的第一项必须是 Payload 目录名，所以把目录改回 Payload 再打包
-          mkdir -p nfcpkg && rm -rf nfcpkg/Payload && cp -R PayloadNfc nfcpkg/Payload
-          (cd nfcpkg && zip -qry ../AtomAssistant-nfc.ipa Payload)
-          ls -lh AtomAssistant-nfc.ipa
-
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
         with:
           name: AtomAssistant-ipa
           path: |
             AtomAssistant.ipa
-            AtomAssistant-nfc.ipa
           if-no-files-found: error
 
       - name: 上传编译日志
@@ -95,9 +76,8 @@ jobs:
         with:
           tag_name: latest
           name: 最新构建
-          body: 由 CI 自动构建的未签名 IPA。AtomAssistant.ipa 是普通版；AtomAssistant-nfc.ipa 额外带 NFC 读取权限，用 WiredResign 签名后安装。
+          body: 由 CI 自动构建的未签名 IPA。用 WiredResign 签名后安装。
           make_latest: true
           files: |
             AtomAssistant.ipa
-            AtomAssistant-nfc.ipa
           fail_on_unmatched_files: false

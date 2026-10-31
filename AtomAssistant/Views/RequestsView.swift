@@ -62,8 +62,6 @@ struct RequestDetailView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
     let request: PendingRequest
-    /// 为真时一出现就开始采集（NFC 读取：打开 App 就弹出读取框）。
-    var autoStart = false
     @State private var confirmDecline = false
 
     private var state: FulfilState { model.fulfil[request.id] ?? .idle }
@@ -107,9 +105,6 @@ struct RequestDetailView: View {
         } message: {
             Text("助手会收到「用户拒绝」，不会再用同样的理由重复要。")
         }
-        .task {
-            if autoStart, state == .idle { await run() }
-        }
         .onDisappear {
             if case .failed = state { model.resetFulfil(request.id) }
         }
@@ -123,7 +118,7 @@ struct RequestDetailView: View {
                 Button {
                     Haptics.tap()
                     Task { await run() }
-                } label: { Label(request.kind == DataKind.nfcRead.rawValue ? "开始读取" : "同意并采集", systemImage: "checkmark.circle.fill") }
+                } label: { Label("同意并采集", systemImage: "checkmark.circle.fill") }
                     .buttonStyle(PrimaryButtonStyle())
                 Button { confirmDecline = true } label: { Text("拒绝") }
                     .buttonStyle(PrimaryButtonStyle(destructive: true))
@@ -132,7 +127,7 @@ struct RequestDetailView: View {
         case .collecting, .uploading:
             VStack(spacing: 12) {
                 ProgressView().controlSize(.large)
-                Text(state == .collecting ? (request.kind == DataKind.nfcRead.rawValue ? "请把手机靠近标签…" : "正在采集…") : "正在上传…")
+                Text(state == .collecting ? "正在采集…" : "正在上传…")
                     .font(.system(size: 17, weight: .medium))
                 if request.kind == DataKind.locationTrack.rawValue {
                     Text("轨迹要持续采集一段时间，期间可以切到别的 App，但不要划掉原子助手。")

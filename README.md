@@ -10,7 +10,7 @@
 | 类型 | 种类 |
 |---|---|
 | 持续上报（App 里勾选） | 设备状态、系统信息、网络状态、计步、运动状态、正在播放、音乐库、专注模式 |
-| 按次授权（助手提出需求并在聊天里提醒你，你在 App 里点同意才采集） | 当前位置、位置轨迹、运动历史、NFC 标签、蓝牙扫描、局域网扫描 |
+| 按次授权（助手提出需求并在聊天里提醒你，你在 App 里点同意才采集） | 当前位置、位置轨迹、运动历史、蓝牙扫描、局域网扫描 |
 
 日历、提醒事项、通讯录、邮件走服务器直连（CalDAV / CardDAV / IMAP），不经过这个 App。不读剪贴板、不读相册。
 
@@ -26,7 +26,7 @@
 推送到 `main` 后 GitHub Actions 在 macOS 上编译，产出**未签名**的 `AtomAssistant.ipa`
 （Actions 的 artifact 里，同时发布在 Releases 的 `latest`）。再用 WiredResign 自签名安装。
 
-每次构建会产出两个包：`AtomAssistant.ipa` 是普通版，不带任何特殊权限，一定能装；`AtomAssistant-nfc.ipa` 额外带 NFC 读取的 entitlement，用来读 NFC 标签。免费 Apple ID 的描述文件能力表里 NFC 标签读取是可用的，但重签工具是否保留这项权限不一定，读不了 NFC 时系统会报“不能读 NFC”。
+每次构建产出一个未签名的 `AtomAssistant.ipa`，不带任何特殊权限。
 
 ## 限制
 

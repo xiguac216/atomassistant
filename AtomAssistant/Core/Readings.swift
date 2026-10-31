@@ -36,7 +36,6 @@ enum Readable {
         case .locationNow: return location(p)
         case .locationTrack: return track(samples)
         case .motionQuery: return perDay(samples, motionDay)
-        case .nfcRead: return nfc(p)
         case .bluetoothScan: return bluetooth(p)
         case .networkScan: return lan(p)
         case .probeReport: return []
@@ -252,16 +251,6 @@ enum Readable {
     }
 
     // MARK: 扫描类
-
-    private static func nfc(_ p: [String: Any]) -> [ReadingRow] {
-        let recs = p["records"] as? [[String: Any]] ?? []
-        var rows = [ReadingRow(label: "记录数", value: "\(recs.count)")]
-        for (i, r) in recs.enumerated() {
-            let value = str(r["uri"]) ?? str(r["text"]) ?? "（二进制 \(num(r["payloadBytes"]).map { "\(Int($0))" } ?? "?") 字节）"
-            rows.append(.init(label: "记录 \(i + 1)·\(str(r["format"]) ?? "")", value: value))
-        }
-        return rows
-    }
 
     private static func bluetooth(_ p: [String: Any]) -> [ReadingRow] {
         let devs = p["devices"] as? [[String: Any]] ?? []

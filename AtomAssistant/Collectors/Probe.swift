@@ -4,7 +4,6 @@ import CoreMotion
 import CoreLocation
 import Intents
 import UserNotifications
-import CoreNFC
 
 struct ProbeResult: Identifiable {
     enum Status { case ok, partial, blocked }
@@ -51,11 +50,6 @@ enum Prober {
         let focus = INFocusStatusCenter.default.authorizationStatus
         r.append(.init(group: "公开接口", name: "专注模式状态", status: authStatus(focus == .authorized, focus == .notDetermined),
                        detail: "权限：" + (focus == .authorized ? "已授权" : focus == .notDetermined ? "未询问" : "被拒绝或受限")))
-
-        r.append(.init(group: "公开接口", name: "NFC 读取", status: NFCNDEFReaderSession.readingAvailable ? .partial : .blocked,
-                       detail: NFCNDEFReaderSession.readingAvailable
-                           ? "硬件支持。能否真正读到取决于签名带不带 NFC entitlement（用 AtomAssistant-full.ipa），读取时会弹出系统读取框"
-                           : "这台设备不支持"))
 
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         r.append(.init(group: "公开接口", name: "本地通知", status: settings.authorizationStatus == .authorized ? .ok : .partial,

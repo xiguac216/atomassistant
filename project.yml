@@ -52,7 +52,6 @@ targets:
         NSMotionUsageDescription: 读取计步和运动状态，上报给你自己的助手。
         NSLocationWhenInUseUsageDescription: 只在你同意某次授权需求时读取位置，发给你自己的助手。
         NSLocationAlwaysAndWhenInUseUsageDescription: 只在你同意某次授权需求时读取位置，发给你自己的助手。
-        NFCReaderUsageDescription: 助手需要读取一个 NFC 标签时，你把手机靠近标签，内容只发给你自己的服务器。
         NSBluetoothAlwaysUsageDescription: 助手需要扫描附近的蓝牙设备时，你同意后才会扫描，结果只发给你自己的服务器。
         NSLocalNetworkUsageDescription: 助手需要扫描当前局域网里的设备时，你同意后才会扫描，结果只发给你自己的服务器。
         NSBonjourServices:
@@ -77,5 +76,4 @@ targets:
       - sdk: BackgroundTasks.framework
       - sdk: UserNotifications.framework
       - sdk: CoreTelephony.framework
-      - sdk: CoreNFC.framework
       - sdk: CoreBluetooth.framework
