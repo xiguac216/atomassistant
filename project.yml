@@ -1,0 +1,70 @@
+name: AtomAssistant
+options:
+  bundleIdPrefix: com.xiguac
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+  developmentLanguage: zh-Hans
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    SWIFT_STRICT_CONCURRENCY: minimal
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGNING_ALLOWED: "NO"
+    CODE_SIGNING_REQUIRED: "NO"
+    ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+targets:
+  AtomAssistant:
+    type: application
+    platform: iOS
+    sources:
+      - path: AtomAssistant
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.xiguac.atomassistant
+        PRODUCT_NAME: AtomAssistant
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: "NO"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    info:
+      path: AtomAssistant/Info.plist
+      properties:
+        CFBundleDisplayName: 原子助手
+        CFBundleName: AtomAssistant
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UIBackgroundModes:
+          - fetch
+          - processing
+          - location
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.xiguac.atomassistant.refresh
+        CFBundleURLTypes:
+          - CFBundleURLName: com.xiguac.atomassistant
+            CFBundleURLSchemes:
+              - atomassistant
+        NSCameraUsageDescription: 扫描后台显示的二维码，把这台手机连到你的服务器。
+        NSMotionUsageDescription: 读取计步和运动状态，上报给你自己的助手。
+        NSHealthShareUsageDescription: 读取健康数据，上报给你自己的助手。
+        NSHealthUpdateUsageDescription: 原子助手不会写入健康数据。
+        NSLocationWhenInUseUsageDescription: 只在你同意某次授权需求时读取位置，发给你自己的助手。
+        NSLocationAlwaysAndWhenInUseUsageDescription: 只在你同意某次授权需求时读取位置，发给你自己的助手。
+        NSAppleMusicUsageDescription: 读取音乐库摘要，上报给你自己的助手。
+        NSFocusStatusUsageDescription: 读取专注模式是否开启，上报给你自己的助手。
+        NSLocalNetworkUsageDescription: 读取当前网络状态。
+    dependencies:
+      - sdk: HealthKit.framework
+      - sdk: CoreMotion.framework
+      - sdk: CoreLocation.framework
+      - sdk: MediaPlayer.framework
+      - sdk: Intents.framework
+      - sdk: NetworkExtension.framework
+      - sdk: AVFoundation.framework
+      - sdk: BackgroundTasks.framework
+      - sdk: UserNotifications.framework
+      - sdk: CoreTelephony.framework

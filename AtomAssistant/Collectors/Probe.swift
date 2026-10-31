@@ -1,0 +1,162 @@
+import Foundation
+import UIKit
+import HealthKit
+import CoreMotion
+import CoreLocation
+import MediaPlayer
+import Intents
+import UserNotifications
+
+struct ProbeResult: Identifiable {
+    enum Status { case ok, partial, blocked }
+    let id = UUID()
+    let group: String
+    let name: String
+    let status: Status
+    let detail: String
+}
+
+/// 能力探测：在这台手机上实测每一类数据到底拿不拿得到。
+/// 全部只读，不弹权限框（没授权的只报「未授权」）；私有接口真的去调一次，看系统放不放行。
+enum Prober {
+    static func run() async -> [ProbeResult] {
+        var out: [ProbeResult] = []
+
+        // 私有接口
+        let g = PrivateAPI.gestalt()
+        if let v = g.value {
+            let names = v.keys.sorted().joined(separator: "、")
+            out.append(.init(group: "私有接口", name: "MobileGestalt 设备信息", status: .ok, detail: "读到 \(v.count) 项：\(names)"))
+        } else {
+            out.append(.init(group: "私有接口", name: "MobileGestalt 设备信息", status: .blocked, detail: g.error ?? "未知"))
+        }
+        let b = PrivateAPI.batteryDetail()
+        if let v = b.value {
+            out.append(.init(group: "私有接口", name: "IOKit 电池详情", status: .ok,
+                             detail: v.keys.sorted().map { "\($0)=\(v[$0] ?? "")" }.joined(separator: "，")))
+        } else {
+            out.append(.init(group: "私有接口", name: "IOKit 电池详情", status: .blocked, detail: b.error ?? "未知"))
+        }
+        let np = await PrivateAPI.nowPlaying()
+        if let v = np.value {
+            out.append(.init(group: "私有接口", name: "MediaRemote 正在播放", status: .ok, detail: "读到 \(v.count) 个字段：\(v.keys.sorted().joined(separator: "、"))"))
+        } else {
+            // 没在播放和被拦了在这里分不开，所以只说「没拿到」。
+            out.append(.init(group: "私有接口", name: "MediaRemote 正在播放", status: .partial, detail: (np.error ?? "未知") + "。放首歌再探测一次可以区分是没在播还是被拦了"))
+        }
+        let apps = PrivateAPI.installedApps()
+        if let v = apps.value {
+            out.append(.init(group: "私有接口", name: "LaunchServices 已安装应用", status: .ok, detail: "读到 \(v.count) 个应用"))
+        } else {
+            out.append(.init(group: "私有接口", name: "LaunchServices 已安装应用", status: .blocked, detail: apps.error ?? "未知"))
+        }
+        for (name, path) in [
+            ("CoreDuet（使用行为库）", "/System/Library/PrivateFrameworks/CoreDuet.framework/CoreDuet"),
+            ("SpringBoardServices", "/System/Library/PrivateFrameworks/SpringBoardServices.framework/SpringBoardServices"),
+            ("BackBoardServices", "/System/Library/PrivateFrameworks/BackBoardServices.framework/BackBoardServices"),
+            ("CoreTelephony 私有部分", "/System/Library/PrivateFrameworks/CoreTelephony.framework/CoreTelephony"),
+        ] {
+            let ok = PrivateAPI.canLoad(path)
+            out.append(.init(group: "私有接口", name: "加载 \(name)", status: ok ? .partial : .blocked,
+                             detail: ok ? "能加载，但具体功能多半还要 entitlement，需要进一步试" : "加载失败"))
+        }
+
+        // 沙盒：别的 App 和系统的数据文件读不读得到
+        let paths: [(String, String)] = [
+            ("短信库", "/var/mobile/Library/SMS/sms.db"),
+            ("通话记录", "/var/mobile/Library/CallHistoryDB/CallHistory.storedata"),
+            ("通讯录库", "/var/mobile/Library/AddressBook/AddressBook.sqlitedb"),
+            ("备忘录库", "/var/mobile/Library/Notes/notes.sqlite"),
+            ("Safari 书签", "/var/mobile/Library/Safari/Bookmarks.db"),
+            ("使用行为库 knowledgeC", "/private/var/mobile/Library/CoreDuet/Knowledge/knowledgeC.db"),
+            ("相册库", "/var/mobile/Media/PhotoData/Photos.sqlite"),
+            ("系统偏好设置目录", "/var/mobile/Library/Preferences"),
+            ("应用安装目录", "/var/containers/Bundle/Application"),
+        ]
+        for (name, path) in paths {
+            let fd = open(path, O_RDONLY)
+            if fd >= 0 {
+                close(fd)
+                out.append(.init(group: "沙盒", name: name, status: .ok, detail: "可以打开：\(path)"))
+            } else {
+                let e = errno
+                out.append(.init(group: "沙盒", name: name, status: .blocked, detail: "打不开（\(String(cString: strerror(e)))）"))
+            }
+        }
+
+        // 公开接口与权限
+        out.append(contentsOf: await publicChecks())
+        return out
+    }
+
+    private static func publicChecks() async -> [ProbeResult] {
+        var r: [ProbeResult] = []
+
+        r.append(.init(group: "公开接口", name: "HealthKit",
+                       status: HKHealthStore.isHealthDataAvailable() ? .partial : .blocked,
+                       detail: HKHealthStore.isHealthDataAvailable()
+                           ? "系统支持。能否读到取决于签名有没有 HealthKit entitlement，在「数据源」里打开健康摘要实测"
+                           : "这台设备不支持"))
+
+        let pedo = CMPedometer.isStepCountingAvailable()
+        r.append(.init(group: "公开接口", name: "计步", status: pedo ? authStatus(CMPedometer.authorizationStatus() == .authorized, CMPedometer.authorizationStatus() == .notDetermined) : .blocked,
+                       detail: "运动与健身权限：" + motionAuth(CMPedometer.authorizationStatus())))
+        r.append(.init(group: "公开接口", name: "运动状态",
+                       status: CMMotionActivityManager.isActivityAvailable() ? authStatus(CMMotionActivityManager.authorizationStatus() == .authorized, CMMotionActivityManager.authorizationStatus() == .notDetermined) : .blocked,
+                       detail: "运动与健身权限：" + motionAuth(CMMotionActivityManager.authorizationStatus())))
+
+        let loc = CLLocationManager().authorizationStatus
+        r.append(.init(group: "公开接口", name: "定位", status: authStatus(loc == .authorizedWhenInUse || loc == .authorizedAlways, loc == .notDetermined),
+                       detail: "权限：" + locAuth(loc)))
+
+        let lib = MPMediaLibrary.authorizationStatus()
+        r.append(.init(group: "公开接口", name: "音乐库", status: authStatus(lib == .authorized, lib == .notDetermined),
+                       detail: "权限：" + (lib == .authorized ? "已授权" : lib == .notDetermined ? "未询问" : "被拒绝或受限")))
+
+        let focus = INFocusStatusCenter.default.authorizationStatus
+        r.append(.init(group: "公开接口", name: "专注模式状态", status: authStatus(focus == .authorized, focus == .notDetermined),
+                       detail: "权限：" + (focus == .authorized ? "已授权" : focus == .notDetermined ? "未询问" : "被拒绝或受限")))
+
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        r.append(.init(group: "公开接口", name: "本地通知", status: settings.authorizationStatus == .authorized ? .ok : .partial,
+                       detail: settings.authorizationStatus == .authorized ? "已授权" : "未授权，授权需求到来时手机不会提醒你"))
+
+        let refresh = await MainActor.run { UIApplication.shared.backgroundRefreshStatus }
+        r.append(.init(group: "公开接口", name: "后台刷新", status: refresh == .available ? .ok : .blocked,
+                       detail: refresh == .available ? "可用：系统会在合适的时候让 App 在后台同步" : "被关闭或受限：请到 设置 → 通用 → 后台 App 刷新 打开"))
+        return r
+    }
+
+    private static func authStatus(_ granted: Bool, _ undecided: Bool) -> ProbeResult.Status {
+        granted ? .ok : (undecided ? .partial : .blocked)
+    }
+
+    private static func motionAuth(_ s: CMAuthorizationStatus) -> String {
+        switch s {
+        case .authorized: return "已授权"
+        case .notDetermined: return "未询问"
+        default: return "被拒绝或受限"
+        }
+    }
+
+    private static func locAuth(_ s: CLAuthorizationStatus) -> String {
+        switch s {
+        case .authorizedAlways: return "始终"
+        case .authorizedWhenInUse: return "使用期间"
+        case .notDetermined: return "未询问"
+        default: return "被拒绝或受限"
+        }
+    }
+
+    /// 探测结果整理成可以上传的报告。
+    static func report(_ results: [ProbeResult]) -> [String: Any] {
+        [
+            "generatedAt": Date(),
+            "results": results.map { r -> [String: Any] in
+                let s: String
+                switch r.status { case .ok: s = "ok"; case .partial: s = "partial"; case .blocked: s = "blocked" }
+                return ["group": r.group, "name": r.name, "status": s, "detail": r.detail]
+            },
+        ]
+    }
+}

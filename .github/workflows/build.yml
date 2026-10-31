@@ -1,0 +1,108 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      healthkit:
+        description: "额外产出一个带 HealthKit entitlement 的 IPA（免费签名多半签不上，仅用来试）"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode 版本
+        run: xcodebuild -version
+
+      - name: 安装 XcodeGen
+        run: brew install xcodegen
+
+      - name: 生成工程
+        run: xcodegen generate
+
+      - name: 编译（不签名）
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project AtomAssistant.xcodeproj \
+            -scheme AtomAssistant \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            > build.log 2>&1 || { echo "---- 编译失败，错误如下 ----"; grep -E "error:|BUILD FAILED|\*\* BUILD" build.log | sort -u | head -60; exit 1; }
+          tail -n 5 build.log
+
+      - name: 打包 IPA
+        run: |
+          APP=build/Build/Products/Release-iphoneos/AtomAssistant.app
+          test -d "$APP"
+          rm -rf Payload && mkdir Payload
+          cp -R "$APP" Payload/
+          zip -qry AtomAssistant.ipa Payload
+          ls -lh AtomAssistant.ipa
+
+      - name: 额外产出 HealthKit 版
+        if: ${{ inputs.healthkit }}
+        run: |
+          brew install ldid
+          cat > healthkit.entitlements <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>com.apple.developer.healthkit</key><true/>
+            <key>com.apple.developer.healthkit.access</key><array/>
+          </dict></plist>
+          EOF
+          rm -rf PayloadHK && mkdir PayloadHK
+          cp -R Payload/AtomAssistant.app PayloadHK/
+          ldid -Shealthkit.entitlements PayloadHK/AtomAssistant.app/AtomAssistant
+          zip -qry AtomAssistant-healthkit.ipa PayloadHK
+          ls -lh AtomAssistant-healthkit.ipa
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: AtomAssistant-ipa
+          path: |
+            AtomAssistant.ipa
+            AtomAssistant-healthkit.ipa
+          if-no-files-found: error
+
+      - name: 上传编译日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
+
+      - name: 编译失败时把日志发到 build-log
+        if: failure()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-log
+          name: 最近一次失败的编译日志
+          files: build.log
+          fail_on_unmatched_files: false
+
+      - name: 发布到 latest
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: 最新构建
+          body: 由 CI 自动构建的未签名 IPA。用 WiredResign 签名后安装。
+          make_latest: true
+          files: |
+            AtomAssistant.ipa
+            AtomAssistant-healthkit.ipa
+          fail_on_unmatched_files: false
