@@ -96,7 +96,6 @@ struct TaskDetailView: View {
                 HStack(spacing: 14) {
                     Label(relative(current.createdAt), systemImage: "clock").font(.footnote).foregroundStyle(.secondary)
                     Label("\(current.tokens.formatted()) tokens", systemImage: "circle.grid.2x2").font(.footnote).foregroundStyle(.secondary)
-                    Label("¥" + String(format: "%.2f", current.costYuan), systemImage: "yensign.circle").font(.footnote).foregroundStyle(.secondary)
                 }
                 if let r = current.reason, !r.isEmpty, !current.needsUser {
                     Text(r).font(.footnote).foregroundStyle(.secondary)
@@ -181,7 +180,7 @@ struct TaskDetailView: View {
         Section {
             VStack(alignment: .leading, spacing: 10) {
                 Label("预算用尽，任务已挂起", systemImage: "gauge.badge.minus").font(.system(size: 16, weight: .semibold)).foregroundStyle(.orange)
-                Text("已用 ¥\(String(format: "%.2f", b.usageYuan))。建议把上限提高到：\(b.suggestTokens.formatted()) tokens、¥\(String(format: "%.2f", b.suggestYuan))、\(String(format: "%.1f", b.suggestHours)) 小时。")
+                Text("建议把上限提高到：\(b.suggestTokens.formatted()) tokens、\(String(format: "%.1f", b.suggestHours)) 小时。")
                     .font(.subheadline).foregroundStyle(.secondary)
                 Button { act("已提高上限，任务继续执行。") { try await store.raiseBudget(task.id, b) } } label: { Text("按建议提高并继续") }
                     .buttonStyle(SecondaryButtonStyle())

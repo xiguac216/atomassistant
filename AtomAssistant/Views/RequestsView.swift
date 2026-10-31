@@ -1,40 +1,84 @@
 import SwiftUI
 
+/// 授权页：上面是还没处理的需求，下面是授权的历史记录。
 struct RequestsView: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
         NavigationStack {
-            Group {
-                if model.requests.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "checkmark.shield.fill")
-                            .font(.system(size: 54)).foregroundStyle(.green.gradient)
-                        Text("没有待处理的授权").font(.system(size: 20, weight: .semibold, design: .rounded))
-                        Text("助手需要位置、详细健康记录这类最私人的数据时，会在这里问你。你同意了，手机才会去采集。")
-                            .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    }
-                    .padding(32)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .transition(.opacity)
-                } else {
-                    List {
-                        Section {
-                            ForEach(model.requests) { r in
-                                NavigationLink(value: r) { RequestRow(request: r) }
-                            }
-                        } footer: {
-                            Text("原因由助手填写，请核对后再决定。同意后数据只发给你自己的服务器。")
+            List {
+                if !model.requests.isEmpty {
+                    Section {
+                        ForEach(model.requests) { r in
+                            NavigationLink(value: r) { RequestRow(request: r) }
                         }
+                    } header: {
+                        Label("等你处理", systemImage: "hand.raised.fill").foregroundStyle(.orange)
+                    } footer: {
+                        Text("原因由助手填写，请核对后再决定。同意后数据只发给你自己的服务器。")
                     }
-                    .listStyle(.insetGrouped)
+                }
+                Section {
+                    if model.authHistory.isEmpty {
+                        Text("还没有授权记录").foregroundStyle(.secondary)
+                    }
+                    ForEach(model.authHistory) { HistoryRow(record: $0) }
+                } header: {
+                    Text("授权记录")
+                } footer: {
+                    if model.requests.isEmpty {
+                        Text("助手需要位置这类最私人的数据时，会在这里问你，打开 App 也会直接弹出来。你同意了，手机才会去采集。")
+                    }
                 }
             }
+            .listStyle(.insetGrouped)
             .animation(.spring(response: 0.45, dampingFraction: 0.85), value: model.requests)
-            .background(Color(.systemGroupedBackground))
+            .animation(.spring(response: 0.45, dampingFraction: 0.85), value: model.authHistory)
             .navigationTitle("授权")
             .navigationDestination(for: PendingRequest.self) { RequestDetailView(request: $0) }
             .refreshable { await model.refreshRequests() }
+        }
+    }
+}
+
+/// 授权记录里的一行：什么数据、什么理由、结果和时间。
+private struct HistoryRow: View {
+    let record: AuthRecord
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            IconTile(symbol: record.dataKind?.symbol ?? "questionmark", tint: record.dataKind?.tint ?? .gray, size: 34)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(record.dataKind?.title ?? record.kind).font(.system(size: 16, weight: .semibold))
+                    Spacer(minLength: 8)
+                    Text(outcomeText)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(outcomeColor)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(outcomeColor.opacity(0.14), in: Capsule())
+                }
+                Text(record.reason).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                Text(record.at.formatted(date: .abbreviated, time: .shortened))
+                    .font(.caption).foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var outcomeText: String {
+        switch record.outcome {
+        case .approved: return record.count.map { "已同意 · \($0) 条" } ?? "已同意"
+        case .declined: return "已拒绝"
+        case .expired: return "已过期"
+        }
+    }
+
+    private var outcomeColor: Color {
+        switch record.outcome {
+        case .approved: return .green
+        case .declined: return .red
+        case .expired: return .gray
         }
     }
 }

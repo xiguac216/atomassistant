@@ -19,20 +19,22 @@ struct SourcesView: View {
 
                 Section {
                     ForEach(DataKind.allCases.filter { $0.perUse }) { kind in
-                        HStack(spacing: 12) {
-                            IconTile(symbol: kind.symbol, tint: kind.tint)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(kind.title).font(.system(size: 16))
-                                Text(kind.detail).font(.footnote).foregroundStyle(.secondary)
+                        NavigationLink(value: kind) {
+                            HStack(spacing: 12) {
+                                IconTile(symbol: kind.symbol, tint: kind.tint)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(kind.title).font(.system(size: 16))
+                                    Text(kind.detail).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                                }
+                                Spacer(minLength: 8)
+                                Text("每次问你").font(.footnote).foregroundStyle(.secondary)
                             }
-                            Spacer()
-                            Text("每次问你").font(.footnote).foregroundStyle(.secondary)
                         }
                     }
                 } header: {
                     Text("按次授权")
                 } footer: {
-                    Text("这些最私人的数据不会自动上报。助手需要时会在「授权」里问你，你同意了才采集。")
+                    Text("这些最私人的数据不会自动上报。助手需要时会在「授权」里问你，你同意了才采集。点进去也可以自己读一次看看，读到的内容只显示在手机上。")
                 }
             }
         .listStyle(.insetGrouped)
@@ -85,8 +87,11 @@ struct SourcesView: View {
 
 struct SourceDetailView: View {
     @EnvironmentObject var model: AppModel
+    @StateObject private var live = LiveModel()
     let kind: DataKind
     @State private var busy = false
+
+    private var manual: [ManualAction] { manualActions(for: kind) }
 
     var body: some View {
         List {
@@ -100,44 +105,78 @@ struct SourceDetailView: View {
                 }
                 .padding(.vertical, 4)
             }
-            Section("状态") {
-                LabeledContent("持续上报", value: model.enabled.contains(kind.rawValue) ? "已开启" : "未开启")
-                LabeledContent("最近上传", value: relative(model.lastUpload[kind.rawValue]))
-                LabeledContent("累计上传", value: "\(model.uploadCount[kind.rawValue] ?? 0) 条")
-                if let err = model.collectErrors[kind.rawValue] {
-                    Label(err, systemImage: "exclamationmark.triangle.fill").font(.footnote).foregroundStyle(.orange)
+            if !kind.perUse {
+                Section("状态") {
+                    LabeledContent("持续上报", value: model.enabled.contains(kind.rawValue) ? "已开启" : "未开启")
+                    LabeledContent("最近上传", value: relative(model.lastUpload[kind.rawValue]))
+                    LabeledContent("累计上传", value: "\(model.uploadCount[kind.rawValue] ?? 0) 条")
+                    if let err = model.collectErrors[kind.rawValue] {
+                        Label(err, systemImage: "exclamationmark.triangle.fill").font(.footnote).foregroundStyle(.orange)
+                    }
                 }
             }
             Section {
-                Button {
-                    Haptics.tap()
-                    busy = true
-                    Task {
-                        // 手动采集一次：没开启的也采，方便看这台手机上到底能拿到什么。
-                        await model.collectOnce(kind)
-                        busy = false
+                if kind.perUse {
+                    ForEach(manual) { m in
+                        Button {
+                            Haptics.tap()
+                            Task { await live.run(kind, params: m.params) }
+                        } label: {
+                            HStack {
+                                Text(m.title)
+                                Spacer()
+                                if case .running = live.results[kind] { ProgressView() }
+                            }
+                        }
                     }
-                } label: {
-                    HStack {
-                        Text("现在采集并上传一次")
-                        Spacer()
-                        if busy { ProgressView() }
-                    }
-                }
-                .disabled(busy)
-            } footer: {
-                Text("会先请求这种数据需要的权限；采集结果会显示在下面，并上传到服务器。")
-            }
-            Section("最近一次采集到的内容") {
-                if let json = model.lastPayload(kind) {
-                    Text(json)
-                        .font(.system(size: 12, design: .monospaced))
-                        .textSelection(.enabled)
                 } else {
-                    Text("还没有采集过").foregroundStyle(.secondary)
+                    Button {
+                        Haptics.tap()
+                        Task { await live.run(kind) }
+                    } label: {
+                        HStack {
+                            Text("读取一次")
+                            Spacer()
+                            if case .running = live.results[kind] { ProgressView() }
+                        }
+                    }
+                    Button {
+                        Haptics.tap()
+                        busy = true
+                        Task {
+                            // 手动采集一次：没开启的也采，方便看这台手机上到底能拿到什么。
+                            await model.collectOnce(kind)
+                            busy = false
+                        }
+                    } label: {
+                        HStack {
+                            Text("现在采集并上传一次")
+                            Spacer()
+                            if busy { ProgressView() }
+                        }
+                    }
+                    .disabled(busy)
+                }
+            } footer: {
+                Text(kind.perUse
+                     ? "你点按钮就是同意。读到的内容只显示在手机上，不会上传。"
+                     : "「读取一次」只在手机上显示，用来核对准不准；「采集并上传」会先请求权限，再把结果交给服务器。")
+            }
+            if live.results[kind] != nil {
+                ReadingSection(kind: kind, result: live.results[kind], onRefresh: nil)
+            }
+            if !kind.perUse, live.results[kind] == nil, let json = model.lastPayload(kind) {
+                Section {
+                    DisclosureGroup("最近一次采集到的原始内容") {
+                        Text(json)
+                            .font(.system(size: 11, design: .monospaced))
+                            .textSelection(.enabled)
+                    }
+                    .font(.footnote)
                 }
             }
         }
+        .listStyle(.insetGrouped)
         .navigationTitle(kind.title)
         .navigationBarTitleDisplayMode(.inline)
     }

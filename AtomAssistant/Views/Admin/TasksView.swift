@@ -1,56 +1,16 @@
 import SwiftUI
 
-/// 「任务」页：代替网页后台的概览和任务。打开要先刷脸。
-struct TasksView: View {
-    @StateObject private var store = AdminStore.shared
-    @Environment(\.scenePhase) private var scenePhase
-    @State private var showNew = false
-    @State private var path: [AdminTask] = []
+/// 任务的几个分区：统计、筛选、需要你处理的、其余的。嵌在概览页的列表里（要先刷脸解锁）。
+struct TaskSections: View {
+    @EnvironmentObject var store: AdminStore
 
     var body: some View {
-        NavigationStack(path: $path) {
-            Group {
-                if store.unlocked {
-                    content
-                } else {
-                    LockView()
-                }
-            }
-            .navigationTitle("任务")
-            .toolbar {
-                if store.unlocked {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button { Haptics.tap(); showNew = true } label: { Image(systemName: "square.and.pencil") }
-                    }
-                }
-            }
-            .navigationDestination(for: AdminTask.self) { TaskDetailView(task: $0) }
-            .sheet(isPresented: $showNew) {
-                NewTaskSheet { id in
-                    Task { await store.reload() }
-                    _ = id
-                }
-            }
-        }
-        .onChange(of: scenePhase) { phase in
-            switch phase {
-            case .background: store.noteBackground()
-            case .active: store.noteForeground()
-            default: break
-            }
-        }
-        .environmentObject(store)
-    }
-
-    private var content: some View {
-        List {
+        Group {
             if store.forbidden {
                 Section { forbiddenCard }
             } else {
                 if let o = store.overview {
-                    Section { summary(o) }
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
+                    Section { summary(o) }.plainRow()
                 }
                 Section {
                     Picker("筛选", selection: $store.filter) {
@@ -60,6 +20,7 @@ struct TasksView: View {
                     .onChange(of: store.filter) { _ in Task { await store.reload() } }
                 }
                 .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
 
                 let waiting = store.tasks.filter(\.needsUser)
                 let rest = store.tasks.filter { !$0.needsUser }
@@ -76,20 +37,11 @@ struct TasksView: View {
                     }
                     ForEach(rest) { row($0) }
                 } header: {
-                    if !waiting.isEmpty { Text("其他") }
+                    Text(waiting.isEmpty ? "任务" : "其他")
                 }
                 if let e = store.error {
                     Section { Label(e, systemImage: "exclamationmark.triangle.fill").font(.footnote).foregroundStyle(.orange) }
                 }
-            }
-        }
-        .listStyle(.insetGrouped)
-        .refreshable { await store.reload() }
-        .task {
-            // 停在这一页时每 10 秒刷新一次。
-            while !Task.isCancelled {
-                await store.reload()
-                try? await Task.sleep(nanoseconds: 10 * 1_000_000_000)
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: store.tasks)
@@ -128,17 +80,16 @@ struct TasksView: View {
                 stat("进行中", o.active, .blue)
                 stat("待核实记忆", o.memoryPending ?? 0, .purple)
             }
-            if let cost = o.todayCostYuan, let tokens = o.todayTokens {
+            if let tokens = o.todayTokens {
                 HStack {
                     Label("今日用量", systemImage: "chart.bar.fill").font(.footnote).foregroundStyle(.secondary)
                     Spacer()
-                    Text("\(tokens.formatted()) tokens · ¥\(String(format: "%.2f", cost))")
+                    Text("\(tokens.formatted()) tokens")
                         .font(.system(size: 13, weight: .medium, design: .rounded))
                 }
                 .padding(.horizontal, 4)
             }
         }
-        .padding(.vertical, 4)
     }
 
     private func stat(_ title: String, _ n: Int, _ color: Color) -> some View {

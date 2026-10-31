@@ -1,27 +1,60 @@
 import SwiftUI
 
+/// 概览：上面是连接状态和立即同步，下面是任务（要先刷脸）。
 struct OverviewView: View {
     @EnvironmentObject var model: AppModel
-    let goToRequests: () -> Void
+    @StateObject private var store = AdminStore.shared
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var showNew = false
+    @State private var path: [AdminTask] = []
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    if model.tokenInvalid { invalidBanner }
-                    if !model.requests.isEmpty { requestsBanner }
-                    connectionCard
-                    recentCard
+        NavigationStack(path: $path) {
+            List {
+                if model.tokenInvalid {
+                    Section { invalidBanner }.plainRow()
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .animation(.spring(response: 0.45, dampingFraction: 0.85), value: model.requests.count)
-                .animation(.spring(response: 0.45, dampingFraction: 0.85), value: model.tokenInvalid)
+                Section { connectionCard }.plainRow()
+                if store.unlocked {
+                    TaskSections()
+                } else {
+                    Section { unlockCard }.plainRow()
+                }
             }
-            .background(Color(.systemGroupedBackground))
+            .listStyle(.insetGrouped)
             .navigationTitle("概览")
-            .refreshable { await model.syncNow() }
+            .toolbar {
+                if store.unlocked {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button { Haptics.tap(); showNew = true } label: { Image(systemName: "square.and.pencil") }
+                    }
+                }
+            }
+            .navigationDestination(for: AdminTask.self) { TaskDetailView(task: $0) }
+            .sheet(isPresented: $showNew) {
+                NewTaskSheet { _ in Task { await store.reload() } }
+            }
+            .refreshable {
+                await model.syncNow()
+                await store.reload()
+            }
+            .task {
+                // 停在这一页时每 10 秒刷新一次任务。
+                while !Task.isCancelled {
+                    await store.reload()
+                    try? await Task.sleep(nanoseconds: 10 * 1_000_000_000)
+                }
+            }
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: model.tokenInvalid)
         }
+        .onChange(of: scenePhase) { phase in
+            switch phase {
+            case .background: store.noteBackground()
+            case .active: store.noteForeground()
+            default: break
+            }
+        }
+        .environmentObject(store)
     }
 
     // MARK: 连接状态
@@ -40,7 +73,6 @@ struct OverviewView: View {
                             Image(systemName: statusSymbol)
                                 .font(.system(size: 22, weight: .semibold))
                                 .foregroundStyle(statusColor)
-                                .transition(.scale.combined(with: .opacity))
                         }
                     }
                     VStack(alignment: .leading, spacing: 3) {
@@ -52,18 +84,9 @@ struct OverviewView: View {
                     }
                     Spacer(minLength: 0)
                 }
-                Divider()
-                HStack {
-                    stat("上次同步", relative(model.lastSync))
-                    Spacer()
-                    stat("待上传", "\(model.queueCount) 条")
-                    Spacer()
-                    stat("已开启", "\(model.enabled.count) 项")
-                }
                 if let err = model.syncError {
                     Label(err, systemImage: "exclamationmark.triangle.fill")
                         .font(.footnote).foregroundStyle(.orange)
-                        .transition(.opacity)
                 }
                 Button {
                     Haptics.tap()
@@ -99,38 +122,8 @@ struct OverviewView: View {
         return "已连接"
     }
 
-    private func stat(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.system(size: 15, weight: .semibold, design: .rounded)).contentTransition(.numericText())
-        }
-    }
-
-    // MARK: 横幅
-
-    private var requestsBanner: some View {
-        Button {
-            Haptics.tap()
-            goToRequests()
-        } label: {
-            HStack(spacing: 12) {
-                IconTile(symbol: "hand.raised.fill", tint: .orange, size: 38)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(model.requests.count) 条授权需求等你处理").font(.system(size: 16, weight: .semibold))
-                    Text("助手需要你同意后才会采集").font(.footnote).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
-            }
-            .padding(14)
-            .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .transition(.move(edge: .top).combined(with: .opacity))
-    }
-
     private var invalidBanner: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             IconTile(symbol: "exclamationmark.triangle.fill", tint: .red, size: 38)
             VStack(alignment: .leading, spacing: 2) {
                 Text("这台手机的令牌已失效").font(.system(size: 16, weight: .semibold))
@@ -139,42 +132,34 @@ struct OverviewView: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(14)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .transition(.move(edge: .top).combined(with: .opacity))
     }
 
-    // MARK: 最近上传
-
-    private var recentCard: some View {
+    private var unlockCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
-                Text("上传情况").font(.system(size: 17, weight: .semibold))
-                let kinds = DataKind.continuous.filter { model.enabled.contains($0.rawValue) }
-                if kinds.isEmpty {
-                    Text("还没有开启任何数据。到「数据源」里勾选要上报的内容。")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                } else {
-                    ForEach(kinds) { kind in
-                        HStack(spacing: 12) {
-                            IconTile(symbol: kind.symbol, tint: kind.tint, size: 30)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(kind.title).font(.system(size: 15, weight: .medium))
-                                if let err = model.collectErrors[kind.rawValue] {
-                                    Text(err).font(.caption).foregroundStyle(.orange).lineLimit(2)
-                                } else {
-                                    Text(relative(model.lastUpload[kind.rawValue])).font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer()
-                            Text("\(model.uploadCount[kind.rawValue] ?? 0)")
-                                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.secondary)
-                                .contentTransition(.numericText())
-                        }
+                Label("任务已锁定", systemImage: Biometric.name == "面容 ID" ? "faceid" : "lock.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                Text("用\(Biometric.name)解锁后，可以在这里看任务、批准动作、回复助手。")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                Button {
+                    Task {
+                        if await store.unlock() == nil { Haptics.success(); await store.reload() } else { Haptics.error() }
                     }
-                }
+                } label: { Label("用\(Biometric.name)解锁", systemImage: "lock.open.fill") }
+                    .buttonStyle(SecondaryButtonStyle())
             }
         }
+    }
+}
+
+extension View {
+    /// 列表里一整块自己画的卡片：去掉行的背景和内边距，让它和分组的左右边缘对齐。
+    func plainRow() -> some View {
+        self.listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
     }
 }

@@ -35,6 +35,8 @@ final class AppModel: ObservableObject {
     /// 每种数据最近一次采集失败的原因，采集成功后清掉。
     @Published private(set) var collectErrors: [String: String] = [:]
     @Published private(set) var logs: [LogEntry] = []
+    /// 处理过的授权需求（同意、拒绝、过期），最近的在前。
+    @Published private(set) var authHistory: [AuthRecord] = []
     /// 上报间隔（分钟）：在后台给这台手机设置，每次同步时从服务器读取。
     @Published private(set) var syncMinutes = Defaults.syncMinutes
 
@@ -59,6 +61,7 @@ final class AppModel: ObservableObject {
         queue = Persistence.load([QueuedItem].self, from: "queue.json") ?? []
         queueCount = queue.count
         logs = Persistence.load([LogEntry].self, from: "log.json") ?? []
+        authHistory = Persistence.load([AuthRecord].self, from: "auth-history.json") ?? []
     }
 
     var client: APIClient? {
@@ -134,6 +137,7 @@ final class AppModel: ObservableObject {
         lastSync = nil
         collectErrors = [:]
         logs = []
+        authHistory = []
         fulfil = [:]
         fulfilCache = [:]
         knownRequestIDs = []
@@ -293,6 +297,11 @@ final class AppModel: ObservableObject {
                 Defaults.syncMinutes = m
                 log("上报间隔改为每 \(m) 分钟（后台设置）")
             }
+            // 本机没处理、却从服务器的待办里消失的：过期了，或者在别处处理了。
+            let still = Set(list.map(\.id))
+            for gone in requests where !still.contains(gone.id) && fulfil[gone.id] == nil {
+                recordAuth(gone, .expired)
+            }
             let fresh = list.filter { !knownRequestIDs.contains($0.id) }
             knownRequestIDs = Set(list.map(\.id))
             requests = list.sorted { $0.expiresAt < $1.expiresAt }
@@ -355,6 +364,7 @@ final class AppModel: ObservableObject {
             let n = try await client.fulfil(requestID: r.id, kind: kind.rawValue, items: items)
             fulfilCache[r.id] = nil
             fulfil[r.id] = .done(n)
+            recordAuth(r, .approved, count: n)
             log("已按授权上传 \(kind.title)：\(items.count) 条")
             // 让「完成」的动画有时间被看到，再把它从待处理里拿掉。
             try? await Task.sleep(nanoseconds: 1_400_000_000)
@@ -376,6 +386,7 @@ final class AppModel: ObservableObject {
         guard let client else { return }
         do {
             try await client.decline(requestID: r.id)
+            recordAuth(r, .declined)
             fulfilCache[r.id] = nil
             fulfil[r.id] = nil
             requests.removeAll { $0.id == r.id }
@@ -389,6 +400,13 @@ final class AppModel: ObservableObject {
     }
 
     func resetFulfil(_ id: String) { fulfil[id] = nil }
+
+    private func recordAuth(_ r: PendingRequest, _ outcome: AuthRecord.Outcome, count: Int? = nil) {
+        guard !authHistory.contains(where: { $0.id == r.id }) else { return }
+        authHistory.insert(AuthRecord(id: r.id, kind: r.kind, reason: r.reason, at: Date(), outcome: outcome, count: count), at: 0)
+        if authHistory.count > 200 { authHistory.removeLast(authHistory.count - 200) }
+        if let e = Persistence.save(authHistory, to: "auth-history.json") { NSLog("保存授权记录失败: \(e)") }
+    }
 
     // MARK: 探测报告
 

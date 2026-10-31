@@ -239,3 +239,18 @@ enum JSON {
         return s
     }
 }
+
+/// 一条处理过的授权需求，授权页按时间倒序列出。
+struct AuthRecord: Codable, Identifiable, Equatable {
+    enum Outcome: String, Codable { case approved, declined, expired }
+    /// 就是需求本身的编号：同一条需求只记一次。
+    let id: String
+    let kind: String
+    let reason: String
+    let at: Date
+    let outcome: Outcome
+    /// 同意后上传了几条。
+    let count: Int?
+
+    var dataKind: DataKind? { DataKind(rawValue: kind) }
+}
