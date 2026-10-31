@@ -89,8 +89,8 @@ struct SystemCollector: Collector {
     static func machine() -> String {
         var u = utsname()
         uname(&u)
-        return withUnsafePointer(to: &u.machine) {
-            $0.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: u.machine)) { String(cString: $0) }
+        return withUnsafeBytes(of: &u.machine) { raw in
+            String(cString: raw.bindMemory(to: CChar.self).baseAddress!)
         }
     }
 
