@@ -67,6 +67,7 @@ targets:
           - _googlecast._tcp
           - _companion-link._tcp
           - _device-info._tcp
+        NSFaceIDUsageDescription: 用面容 ID 解锁原子助手的管理功能（看任务、批准动作）。
         NSFocusStatusUsageDescription: 读取专注模式是否开启，上报给你自己的助手。
     dependencies:
       - sdk: CoreMotion.framework
@@ -78,3 +79,4 @@ targets:
       - sdk: CoreTelephony.framework
       - sdk: CoreBluetooth.framework
       - sdk: AppIntents.framework
+      - sdk: LocalAuthentication.framework

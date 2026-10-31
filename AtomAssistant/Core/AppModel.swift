@@ -61,7 +61,7 @@ final class AppModel: ObservableObject {
         logs = Persistence.load([LogEntry].self, from: "log.json") ?? []
     }
 
-    private var client: APIClient? {
+    var client: APIClient? {
         guard paired, let url = URL(string: serverURL), let token = Keychain.get(tokenAccount) else { return nil }
         return APIClient(base: url, token: token)
     }

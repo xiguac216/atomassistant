@@ -59,8 +59,7 @@ struct LiveView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
+        List {
                 Section {
                     Button {
                         Haptics.tap()
@@ -109,9 +108,8 @@ struct LiveView: View {
                     }
                 }
             }
-            .listStyle(.insetGrouped)
-            .navigationTitle("实测")
-        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("实测")
     }
 }
 

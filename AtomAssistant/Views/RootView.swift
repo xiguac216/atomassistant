@@ -23,18 +23,18 @@ struct MainTabView: View {
 
     var body: some View {
         TabView(selection: $tab) {
-            OverviewView(goToRequests: { withAnimation { tab = 1 } })
+            OverviewView(goToRequests: { withAnimation { tab = 2 } })
                 .tabItem { Label("概览", systemImage: "square.grid.2x2.fill") }
                 .tag(0)
+            TasksView()
+                .tabItem { Label("任务", systemImage: "checklist") }
+                .tag(1)
             RequestsView()
                 .tabItem { Label("授权", systemImage: "hand.raised.fill") }
                 .badge(model.requests.count)
-                .tag(1)
+                .tag(2)
             SourcesView()
                 .tabItem { Label("数据源", systemImage: "antenna.radiowaves.left.and.right") }
-                .tag(2)
-            LiveView()
-                .tabItem { Label("实测", systemImage: "checklist") }
                 .tag(3)
             SettingsView()
                 .tabItem { Label("设置", systemImage: "gearshape.fill") }
