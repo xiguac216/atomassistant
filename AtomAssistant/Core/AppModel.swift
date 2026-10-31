@@ -440,7 +440,7 @@ final class AppModel: ObservableObject {
 }
 
 enum BackgroundSync {
-    static let identifier = "com.xiguac.atomassistant.refresh"
+    static let identifier = "io.github.xiguac.ios.atomassistant.refresh"
 
     static func register() {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: nil) { task in

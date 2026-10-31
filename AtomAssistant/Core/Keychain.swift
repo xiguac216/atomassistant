@@ -3,7 +3,7 @@ import Security
 
 /// 设备令牌放在钥匙串里，不放 UserDefaults。
 enum Keychain {
-    private static let service = "com.xiguac.atomassistant"
+    private static let service = "io.github.xiguac.ios.atomassistant"
 
     private static func base(_ account: String) -> [String: Any] {
         [

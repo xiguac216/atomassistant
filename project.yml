@@ -1,6 +1,6 @@
 name: AtomAssistant
 options:
-  bundleIdPrefix: com.xiguac
+  bundleIdPrefix: io.github.xiguac.ios
   deploymentTarget:
     iOS: "16.0"
   createIntermediateGroups: true
@@ -22,7 +22,7 @@ targets:
       - path: AtomAssistant
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.xiguac.atomassistant
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.xiguac.ios.atomassistant
         PRODUCT_NAME: AtomAssistant
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: "NO"
@@ -43,9 +43,9 @@ targets:
           - processing
           - location
         BGTaskSchedulerPermittedIdentifiers:
-          - com.xiguac.atomassistant.refresh
+          - io.github.xiguac.ios.atomassistant.refresh
         CFBundleURLTypes:
-          - CFBundleURLName: com.xiguac.atomassistant
+          - CFBundleURLName: io.github.xiguac.ios.atomassistant
             CFBundleURLSchemes:
               - atomassistant
         NSCameraUsageDescription: 扫描后台显示的二维码，把这台手机连到你的服务器。
