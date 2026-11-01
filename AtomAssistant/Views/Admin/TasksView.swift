@@ -1,115 +1,150 @@
 import SwiftUI
 
-/// 任务的几个分区：统计、筛选、需要你处理的、其余的。嵌在概览页的列表里（要先刷脸解锁）。
+/// 概览里的任务：标题行（数量、今日用量）、分段（进行中 / 待处理 / 已完成）、任务卡片。要先刷脸解锁。
 struct TaskSections: View {
     @EnvironmentObject var store: AdminStore
+    @State private var seg: Seg = .active
+
+    enum Seg: String, CaseIterable, Identifiable {
+        case active, waiting, done
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .active: return "进行中"
+            case .waiting: return "待处理"
+            case .done: return "已完成"
+            }
+        }
+    }
+
+    private static let ended: Set<String> = ["done", "failed", "cancelled"]
+
+    private func belongs(_ t: AdminTask, _ s: Seg) -> Bool {
+        switch s {
+        case .waiting: return t.needsUser
+        case .done: return Self.ended.contains(t.state)
+        case .active: return !t.needsUser && !Self.ended.contains(t.state)
+        }
+    }
 
     var body: some View {
         Group {
             if store.forbidden {
-                Section { forbiddenCard }
+                Section { forbiddenCard.cardRow() }
             } else {
-                if let o = store.overview {
-                    Section { summary(o) }.plainRow()
+                if let o = store.overview, !o.assistantOk {
+                    Section { problem(o).cardRow() }
                 }
+                let shown = store.tasks.filter { belongs($0, seg) }
                 Section {
-                    Picker("筛选", selection: $store.filter) {
-                        ForEach(AdminStore.Filter.allCases) { Text($0.title).tag($0) }
+                    header.cardRow(top: 14, bottom: 4)
+                    Picker("分类", selection: $seg.animation(.spring(response: 0.35, dampingFraction: 0.85))) {
+                        ForEach(Seg.allCases) { s in
+                            let n = store.tasks.filter { belongs($0, s) }.count
+                            Text(n > 0 && s == .waiting ? "\(s.title) \(n)" : s.title).tag(s)
+                        }
                     }
                     .pickerStyle(.segmented)
-                    .onChange(of: store.filter) { _ in Task { await store.reload() } }
-                }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets())
-
-                let waiting = store.tasks.filter(\.needsUser)
-                let rest = store.tasks.filter { !$0.needsUser }
-                if !waiting.isEmpty {
-                    Section {
-                        ForEach(waiting) { row($0) }
-                    } header: {
-                        Label("需要你处理", systemImage: "hand.raised.fill").foregroundStyle(.orange)
+                    .cardRow(top: 4, bottom: 8)
+                    if shown.isEmpty {
+                        Text(store.loading ? "正在加载…" : "这一类没有任务")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity).padding(.vertical, 28)
+                            .cardRow()
+                    }
+                    ForEach(shown) { t in
+                        ZStack {
+                            NavigationLink(value: t) { EmptyView() }.opacity(0)
+                            TaskCard(task: t)
+                        }
+                        .cardRow()
+                    }
+                    if let e = store.error {
+                        Label(e, systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote).foregroundStyle(.orange).cardRow()
                     }
                 }
-                Section {
-                    if rest.isEmpty && waiting.isEmpty {
-                        Text(store.loading ? "正在加载…" : "没有任务").foregroundStyle(.secondary)
-                    }
-                    ForEach(rest) { row($0) }
-                } header: {
-                    Text(waiting.isEmpty ? "任务" : "其他")
-                }
-                if let e = store.error {
-                    Section { Label(e, systemImage: "exclamationmark.triangle.fill").font(.footnote).foregroundStyle(.orange) }
-                }
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: store.tasks)
-    }
-
-    private func row(_ t: AdminTask) -> some View {
-        NavigationLink(value: t) {
-            HStack(spacing: 12) {
-                StateDot(task: t)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(t.title).font(.system(size: 16, weight: .medium)).lineLimit(2)
-                    Text(subtitle(t)).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
-                }
-                Spacer(minLength: 0)
-                StateChip(task: t)
-            }
-            .padding(.vertical, 2)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: store.tasks)
+        .task {
+            // 分段是在手机上按状态分的，要把各种状态的任务都取回来。
+            if store.filter != .all { store.filter = .all; await store.reload() }
         }
     }
 
-    private func subtitle(_ t: AdminTask) -> String {
-        if t.needsUser, let r = t.reason, !r.isEmpty { return r }
-        return relative(t.updatedAt)
-    }
-
-    private func summary(_ o: AdminOverview) -> some View {
-        VStack(spacing: 10) {
-            if !o.assistantOk {
-                Label(o.assistantProblem ?? "助手没有正常运行", systemImage: "exclamationmark.octagon.fill")
-                    .font(.footnote).foregroundStyle(.red)
-                    .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            }
-            HStack(spacing: 10) {
-                stat("待处理", o.waiting, .orange)
-                stat("进行中", o.active, .blue)
-                stat("待核实记忆", o.memoryPending ?? 0, .purple)
-            }
-            if let tokens = o.todayTokens {
-                HStack {
-                    Label("今日用量", systemImage: "chart.bar.fill").font(.footnote).foregroundStyle(.secondary)
-                    Spacer()
-                    Text("\(tokens.formatted()) tokens")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                }
-                .padding(.horizontal, 4)
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("任务").font(.title3.weight(.bold))
+            Text("\(store.overview?.active ?? 0) 个进行中")
+                .font(.caption.weight(.semibold)).foregroundStyle(Color.accentColor)
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(Color.accentColor.opacity(0.12), in: Capsule())
+            Spacer(minLength: 8)
+            if let tokens = store.overview?.todayTokens {
+                Text("今日 \(tokenText(tokens))")
+                    .font(.footnote).foregroundStyle(.secondary)
+                    .lineLimit(1).minimumScaleFactor(0.8)
             }
         }
     }
 
-    private func stat(_ title: String, _ n: Int, _ color: Color) -> some View {
-        VStack(spacing: 2) {
-            Text("\(n)").font(.system(size: 26, weight: .bold, design: .rounded)).foregroundStyle(color)
-                .contentTransition(.numericText())
-            Text(title).font(.caption).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    private func problem(_ o: AdminOverview) -> some View {
+        Label(o.assistantProblem ?? "助手没有正常运行", systemImage: "exclamationmark.octagon.fill")
+            .font(.footnote).foregroundStyle(.red)
+            .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var forbiddenCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("这台手机还没有管理权限", systemImage: "lock.shield.fill").font(.system(size: 17, weight: .semibold))
-            Text("为了安全，配对后的手机默认只能上报数据。请在电脑上打开网页后台的「手机」页，找到这台手机，点「允许管理后台」，再回来下拉刷新。")
-                .font(.subheadline).foregroundStyle(.secondary)
+        Card {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("这台手机还没有管理权限", systemImage: "lock.shield.fill").font(.system(size: 17, weight: .semibold))
+                Text("为了安全，配对后的手机默认只能上报数据。请在电脑上打开网页后台的「手机」页，找到这台手机，点「允许管理后台」，再回来下拉刷新。")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
         }
-        .padding(.vertical, 6)
+    }
+}
+
+/// 一张任务卡片：标题和状态、一句说明、时间和用量。要你处理的带一圈醒目的边。
+struct TaskCard: View {
+    let task: AdminTask
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(task.title).font(.headline).lineLimit(2)
+                Spacer(minLength: 8)
+                StateChip(task: task)
+            }
+            if let r = task.reason, !r.isEmpty {
+                Text(r).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+            }
+            if task.needsUser {
+                Label("需要你处理，点开批准或回复", systemImage: "hand.raised.fill")
+                    .font(.footnote.weight(.medium)).foregroundStyle(.orange)
+                    .padding(10).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            Divider()
+            HStack {
+                Text(relative(task.updatedAt)).font(.caption.weight(.semibold))
+                Spacer(minLength: 8)
+                if task.tokens > 0 {
+                    Label(tokenText(task.tokens), systemImage: "circle.dotted")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            if task.needsUser {
+                RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Color.orange.opacity(0.5), lineWidth: 1.5)
+            }
+        }
     }
 }
 

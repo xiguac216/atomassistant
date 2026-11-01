@@ -121,7 +121,7 @@ struct PageView: View {
     private func select(_ to: String) {
         guard to != (current ?? path) else { return }
         Haptics.tap()
-        withAnimation(.snappy) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
             current = to
             page = nil
             banner = nil

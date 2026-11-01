@@ -1,49 +1,96 @@
 import SwiftUI
 
 struct SourcesView: View {
+    var body: some View {
+        List { SourcesSections() }
+            .listStyle(.insetGrouped)
+            .navigationTitle("数据源")
+            .navigationDestination(for: DataKind.self) { SourceDetailView(kind: $0) }
+    }
+}
+
+/// 数据源的两个分区：持续上报（带开关）和按次授权（读取一次、实测读数）。设置页直接嵌在里面。
+struct SourcesSections: View {
     @EnvironmentObject var model: AppModel
+    @StateObject private var live = LiveModel()
     @State private var alertText: String?
     @State private var working: Set<String> = []
 
     var body: some View {
-        List {
-                Section {
-                    ForEach(DataKind.continuous) { kind in
-                        row(kind)
-                    }
-                } header: {
-                    Text("持续上报")
-                } footer: {
-                    Text("勾选后，App 按后台设置的间隔采集（现在是每 \(model.syncMinutes) 分钟），系统允许时也会在后台刷新。间隔在服务器后台「手机」页里改。打开开关时会请求所需的系统权限。")
+        Group {
+            Section {
+                ForEach(DataKind.continuous) { kind in
+                    row(kind)
                 }
-
-                Section {
-                    ForEach(DataKind.allCases.filter { $0.perUse }) { kind in
-                        NavigationLink(value: kind) {
-                            HStack(spacing: 12) {
-                                IconTile(symbol: kind.symbol, tint: kind.tint)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(kind.title).font(.system(size: 16))
-                                    Text(kind.detail).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
-                                }
-                                Spacer(minLength: 8)
-                                Text("每次问你").font(.footnote).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                } header: {
-                    Text("按次授权")
-                } footer: {
-                    Text("这些最私人的数据不会自动上报。助手需要时会在「授权」里问你，你同意了才采集。点进去也可以自己读一次看看，读到的内容只显示在手机上。")
-                }
+            } header: {
+                Text("数据源与权限控制")
+            } footer: {
+                Text("勾选后，App 按后台设置的间隔采集（现在是每 \(model.syncMinutes) 分钟），系统允许时也会在后台刷新。打开开关时会请求所需的系统权限。")
             }
-        .listStyle(.insetGrouped)
-        .navigationTitle("数据源")
-        .navigationDestination(for: DataKind.self) { SourceDetailView(kind: $0) }
+
+            Section {
+                ForEach(DataKind.allCases.filter { $0.perUse }) { kind in
+                    perUseRow(kind)
+                }
+            } header: {
+                HStack {
+                    Text("按次授权与敏感情报")
+                    Spacer()
+                    Text("每次问你").font(.caption.weight(.semibold)).textCase(nil)
+                }
+            } footer: {
+                Text("这些最私人的数据不会自动上报。助手需要时会在「授权」里问你，你同意了才采集。点「读取一次」自己读一遍，读到的内容只显示在手机上。")
+            }
+        }
         .alert("无法开启", isPresented: Binding(get: { alertText != nil }, set: { if !$0 { alertText = nil } })) {
             Button("好") {}
         } message: {
             Text(alertText ?? "")
+        }
+    }
+
+    private func perUseRow(_ kind: DataKind) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                NavigationLink(value: kind) {
+                    HStack(spacing: 12) {
+                        IconTile(symbol: kind.symbol, tint: kind.tint)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(kind.title).font(.system(size: 16))
+                            Text(kind.detail).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                    }
+                }
+                Button {
+                    Haptics.tap()
+                    Task { await live.run(kind, params: manualActions(for: kind).first?.params ?? [:]) }
+                } label: {
+                    Text("读取一次").font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(CompactPrimaryStyle())
+                .fixedSize()
+            }
+            HStack(alignment: .firstTextBaseline) {
+                Text("实测读数").font(.footnote).foregroundStyle(.secondary)
+                Spacer(minLength: 12)
+                Text(readingText(kind))
+                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                    .multilineTextAlignment(.trailing).lineLimit(2)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 9)
+            .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func readingText(_ kind: DataKind) -> String {
+        guard let r = live.results[kind] else { return "还没读取" }
+        switch r {
+        case .running: return "正在读取…"
+        case .failed(let why): return why
+        case .ok(let reading):
+            guard let first = reading.rows.first else { return "读到了，但没有可显示的内容" }
+            return "\(first.label) \(first.value)"
         }
     }
 

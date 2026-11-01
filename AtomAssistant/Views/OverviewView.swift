@@ -12,16 +12,18 @@ struct OverviewView: View {
         NavigationStack(path: $path) {
             List {
                 if model.tokenInvalid {
-                    Section { invalidBanner }.plainRow()
+                    Section { invalidBanner.cardRow() }
                 }
-                Section { connectionCard }.plainRow()
+                Section { connectionCard.cardRow(top: 8) }
                 if store.unlocked {
                     TaskSections()
                 } else {
-                    Section { unlockCard }.plainRow()
+                    Section { unlockCard.cardRow() }
                 }
             }
-            .listStyle(.insetGrouped)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("概览")
             .toolbar {
                 if store.unlocked {
@@ -61,45 +63,35 @@ struct OverviewView: View {
 
     private var connectionCard: some View {
         Card {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 14) {
-                    ZStack {
-                        Circle().fill(statusColor.opacity(0.15)).frame(width: 52, height: 52)
-                        if model.syncing {
-                            SpinningSymbol(symbol: "arrow.triangle.2.circlepath")
-                                .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(statusColor)
-                        } else {
-                            Image(systemName: statusSymbol)
-                                .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(statusColor)
-                                .symbolReplace()
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    Circle().fill(statusColor).frame(width: 11, height: 11)
+                        .overlay(Circle().stroke(statusColor.opacity(0.25), lineWidth: 5))
+                        .padding(.leading, 3)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(statusTitle).font(.headline).contentTransition(.opacity)
+                        Text("上次同步 \(relative(model.lastSync)) · \(URL(string: model.serverURL)?.host ?? "")")
+                            .font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+                    }
+                    Spacer(minLength: 8)
+                    Button {
+                        Haptics.tap()
+                        Task { await model.syncNow() }
+                    } label: {
+                        HStack(spacing: 6) {
+                            if model.syncing { SpinningSymbol(symbol: "arrow.triangle.2.circlepath") }
+                            else { Image(systemName: "arrow.triangle.2.circlepath") }
+                            Text(model.syncing ? "同步中" : "立即同步")
                         }
+                        .font(.subheadline.weight(.semibold))
                     }
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(statusTitle)
-                            .font(.system(size: 20, weight: .semibold, design: .rounded))
-                            .contentTransition(.opacity)
-                        Text(model.deviceName + " · " + (URL(string: model.serverURL)?.host ?? ""))
-                            .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
-                    }
-                    Spacer(minLength: 0)
+                    .buttonStyle(CompactPrimaryStyle())
+                    .disabled(model.syncing)
                 }
                 if let err = model.syncError {
                     Label(err, systemImage: "exclamationmark.triangle.fill")
                         .font(.footnote).foregroundStyle(.orange)
                 }
-                Button {
-                    Haptics.tap()
-                    Task { await model.syncNow() }
-                } label: {
-                    HStack(spacing: 8) {
-                        if model.syncing { ProgressView().tint(.white) }
-                        Text(model.syncing ? "正在同步…" : "立即同步")
-                    }
-                }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(model.syncing)
             }
         }
     }

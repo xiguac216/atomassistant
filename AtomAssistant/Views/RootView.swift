@@ -42,7 +42,6 @@ struct MainTabView: View {
                 .tabItem { Label("设置", systemImage: "gearshape.fill") }
                 .tag(3)
         }
-        .minimizeTabBarOnScroll()
         .sheet(item: $popup, onDismiss: { maybePopup() }) { r in
             NavigationStack {
                 RequestDetailView(request: r)

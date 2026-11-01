@@ -77,6 +77,29 @@ struct SecondaryButtonStyle: ButtonStyle {
     }
 }
 
+/// 小号的主操作按钮（卡片里并排放的那种）：iOS 26 起用系统液态玻璃。
+struct CompactPrimaryStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        let label = configuration.label
+            .padding(.horizontal, 14).padding(.vertical, 9)
+            .foregroundStyle(Color.white)
+        if #available(iOS 26, *) {
+            label.glassEffect(.regular.tint(Color.accentColor).interactive(), in: .capsule)
+        } else {
+            label
+                .background(Color.accentColor, in: Capsule())
+                .opacity(configuration.isPressed ? 0.85 : 1)
+                .scaleEffect(configuration.isPressed ? 0.96 : 1)
+                .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+        }
+    }
+}
+
+/// token 用量：只写数字，不写金额。1 万以上用「1.2 万」。
+func tokenText(_ n: Int) -> String {
+    n >= 10000 ? String(format: "%.1f 万 token", Double(n) / 10000) : "\(n.formatted()) token"
+}
+
 /// 「3 分钟前」这样的相对时间。
 func relative(_ date: Date?) -> String {
     guard let date else { return "从未" }
@@ -105,13 +128,16 @@ struct SpinningSymbol: View {
 }
 
 extension View {
+    /// 列表里一整块自己画的卡片：左右各留 20，和屏幕边缘、标题对齐；去掉行的背景和分隔线。
+    func cardRow(top: CGFloat = 6, bottom: CGFloat = 6) -> some View {
+        self.listRowInsets(EdgeInsets(top: top, leading: 20, bottom: bottom, trailing: 20))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+    }
+
     /// 符号换成另一个时用系统的「替换」过渡（iOS 17 起），更早的系统不做动画。
     @ViewBuilder func symbolReplace() -> some View {
         if #available(iOS 17, *) { self.contentTransition(.symbolEffect(.replace)) } else { self }
     }
 
-    /// 向下滚动时让标签栏收起（iOS 26 起，系统自带）。
-    @ViewBuilder func minimizeTabBarOnScroll() -> some View {
-        if #available(iOS 26, *) { self.tabBarMinimizeBehavior(.onScrollDown) } else { self }
-    }
 }

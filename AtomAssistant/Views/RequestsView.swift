@@ -1,43 +1,95 @@
 import SwiftUI
 
-/// 授权页：上面是还没处理的需求，下面是授权的历史记录。
+/// 授权页：上面是还没处理的需求（醒目的卡片），下面是授权的历史记录。
 struct RequestsView: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
         NavigationStack {
             List {
+                Text("助手需要位置这类最私人的数据时会在这里问你，打开 App 也会直接弹出来。你同意了，手机才会去采集。原因由助手填写，请核对后再决定。")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    .cardRow(top: 4, bottom: 8)
                 if !model.requests.isEmpty {
                     Section {
                         ForEach(model.requests) { r in
-                            NavigationLink(value: r) { RequestRow(request: r) }
+                            ZStack {
+                                NavigationLink(value: r) { EmptyView() }.opacity(0)
+                                PendingCard(request: r)
+                            }
+                            .cardRow()
                         }
-                    } header: {
-                        Label("等你处理", systemImage: "hand.raised.fill").foregroundStyle(.orange)
-                    } footer: {
-                        Text("原因由助手填写，请核对后再决定。同意后数据只发给你自己的服务器。")
                     }
                 }
                 Section {
-                    if model.authHistory.isEmpty {
-                        Text("还没有授权记录").foregroundStyle(.secondary)
+                    HStack {
+                        Text("授权记录").font(.title3.weight(.bold))
+                        Text("\(model.authHistory.count)")
+                            .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color(.tertiarySystemFill), in: Capsule())
+                        Spacer()
+                        Text("最新在前").font(.footnote).foregroundStyle(.secondary)
                     }
-                    ForEach(model.authHistory) { HistoryRow(record: $0) }
-                } header: {
-                    Text("授权记录")
-                } footer: {
-                    if model.requests.isEmpty {
-                        Text("助手需要位置这类最私人的数据时，会在这里问你，打开 App 也会直接弹出来。你同意了，手机才会去采集。")
+                    .cardRow(top: 14, bottom: 4)
+                    if model.authHistory.isEmpty {
+                        Text("还没有授权记录").font(.subheadline).foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity).padding(.vertical, 28).cardRow()
+                    } else {
+                        Card {
+                            VStack(spacing: 0) {
+                                ForEach(Array(model.authHistory.enumerated()), id: \.element.id) { i, rec in
+                                    if i > 0 { Divider().padding(.vertical, 12) }
+                                    HistoryRow(record: rec)
+                                }
+                            }
+                        }
+                        .cardRow()
                     }
                 }
             }
-            .listStyle(.insetGrouped)
-            .animation(.spring(response: 0.45, dampingFraction: 0.85), value: model.requests)
-            .animation(.spring(response: 0.45, dampingFraction: 0.85), value: model.authHistory)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color(.systemGroupedBackground))
+            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: model.requests)
+            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: model.authHistory)
             .navigationTitle("授权")
             .navigationDestination(for: PendingRequest.self) { RequestDetailView(request: $0) }
             .refreshable { await model.refreshRequests() }
         }
+    }
+}
+
+/// 还没处理的需求：带一圈醒目的边，点开去同意或拒绝。
+private struct PendingCard: View {
+    let request: PendingRequest
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                IconTile(symbol: request.dataKind?.symbol ?? "questionmark", tint: request.dataKind?.tint ?? .gray, size: 44)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(request.dataKind?.title ?? request.kind).font(.headline)
+                        Text("待处理")
+                            .font(.caption.weight(.semibold)).foregroundStyle(.orange)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color.orange.opacity(0.14), in: Capsule())
+                    }
+                    Text(request.reason).font(.subheadline).foregroundStyle(.secondary).lineLimit(3)
+                }
+            }
+            Divider()
+            HStack {
+                Spacer()
+                Label("查看并处理", systemImage: "chevron.right")
+                    .labelStyle(.titleAndIcon).font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+            }
+        }
+        .padding(16)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Color.orange.opacity(0.5), lineWidth: 1.5))
     }
 }
 
@@ -85,21 +137,6 @@ private struct HistoryRow: View {
 
 extension PendingRequest: Hashable {
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
-}
-
-private struct RequestRow: View {
-    let request: PendingRequest
-
-    var body: some View {
-        HStack(spacing: 12) {
-            IconTile(symbol: request.dataKind?.symbol ?? "questionmark", tint: request.dataKind?.tint ?? .gray, size: 38)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(request.dataKind?.title ?? request.kind).font(.system(size: 16, weight: .semibold))
-                Text(request.reason).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
-            }
-        }
-        .padding(.vertical, 4)
-    }
 }
 
 struct RequestDetailView: View {
