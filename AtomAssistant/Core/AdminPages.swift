@@ -8,9 +8,10 @@ struct UIPage: Decodable {
     let notice: String?
     let error: String?
     let toolbar: [UIItem]
+    let tabs: [UITab]
     let sections: [UISection]
 
-    enum CodingKeys: String, CodingKey { case title, notice, error, toolbar, sections }
+    enum CodingKeys: String, CodingKey { case title, notice, error, toolbar, tabs, sections }
 
     init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self)
@@ -18,8 +19,16 @@ struct UIPage: Decodable {
         notice = try c.decodeIfPresent(String.self, forKey: .notice)
         error = try c.decodeIfPresent(String.self, forKey: .error)
         toolbar = try c.decodeIfPresent([UIItem].self, forKey: .toolbar) ?? []
+        tabs = try c.decodeIfPresent([UITab].self, forKey: .tabs) ?? []
         sections = try c.decodeIfPresent([UISection].self, forKey: .sections) ?? []
     }
+}
+
+/// 页面顶部分段控件里的一段：同一类功能合并成一个入口，在几个页面之间切换。
+struct UITab: Decodable, Identifiable, Hashable {
+    let title: String
+    let path: String
+    var id: String { path }
 }
 
 struct UISection: Decodable, Identifiable {

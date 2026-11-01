@@ -73,6 +73,7 @@ struct OverviewView: View {
                             Image(systemName: statusSymbol)
                                 .font(.system(size: 22, weight: .semibold))
                                 .foregroundStyle(statusColor)
+                                .symbolReplace()
                         }
                     }
                     VStack(alignment: .leading, spacing: 3) {

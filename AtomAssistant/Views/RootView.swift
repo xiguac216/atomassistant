@@ -42,6 +42,7 @@ struct MainTabView: View {
                 .tabItem { Label("设置", systemImage: "gearshape.fill") }
                 .tag(3)
         }
+        .minimizeTabBarOnScroll()
         .sheet(item: $popup, onDismiss: { maybePopup() }) { r in
             NavigationStack {
                 RequestDetailView(request: r)
@@ -49,6 +50,8 @@ struct MainTabView: View {
                         ToolbarItem(placement: .cancellationAction) { Button("稍后") { popup = nil } }
                     }
             }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .onChange(of: model.requests) { _ in maybePopup() }
         .onChange(of: scenePhase) { phase in

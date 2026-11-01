@@ -10,6 +10,9 @@ struct PageView: View {
     let path: String
     var fallbackTitle = ""
 
+    /// 合并入口里当前选中的那一段；没有分段时就是 path 本身。
+    @State private var current: String?
+    @State private var tabs: [UITab] = []
     @State private var page: UIPage?
     @State private var loadError: String?
     @State private var banner: Banner?
@@ -25,6 +28,16 @@ struct PageView: View {
 
     var body: some View {
         List {
+            if tabs.count > 1 {
+                Section {
+                    Picker("分类", selection: Binding(get: { current ?? path }, set: { select($0) })) {
+                        ForEach(tabs) { Text($0.title).tag($0.path) }
+                    }
+                    .pickerStyle(.segmented)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                }
+            }
             if let banner {
                 Section {
                     Label(banner.text, systemImage: banner.ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
@@ -56,7 +69,7 @@ struct PageView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle(page?.title ?? fallbackTitle)
+        .navigationTitle(tabs.first(where: { $0.path == (current ?? path) })?.title ?? page?.title ?? fallbackTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -70,7 +83,7 @@ struct PageView: View {
             }
         }
         .refreshable { await load() }
-        .task(id: path) { await load() }
+        .task(id: current ?? path) { await load() }
         .animation(.easeInOut(duration: 0.2), value: banner)
         .sheet(item: $activeForm) { f in
             FormSheet(form: f) { extra in await submit(f.submit, extra: extra) }
@@ -95,10 +108,23 @@ struct PageView: View {
 
     private func load() async {
         do {
-            page = try await store.loadPage(path)
+            let p = try await store.loadPage(current ?? path)
+            if !p.tabs.isEmpty { tabs = p.tabs }
+            page = p
             loadError = nil
         } catch {
             loadError = error.localizedDescription
+        }
+    }
+
+    /// 切换分段：换一页内容，标题和列表一起过渡。
+    private func select(_ to: String) {
+        guard to != (current ?? path) else { return }
+        Haptics.tap()
+        withAnimation(.snappy) {
+            current = to
+            page = nil
+            banner = nil
         }
     }
 
